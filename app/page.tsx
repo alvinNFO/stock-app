@@ -3,9 +3,20 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
+type StockItem = {
+  quantite: number
+  user_id: string
+  produits: {
+    id: string
+    nom: string
+    reference: string
+    stock_minimum: number
+  }
+}
+
 export default function Home() {
-  const [stock, setStock] = useState([])
-  const [user, setUser] = useState(null)
+  const [stock, setStock] = useState<StockItem[]>([])
+  const [user, setUser] = useState<any>(null)
 
   const fetchUser = async () => {
     const {
@@ -18,17 +29,16 @@ export default function Home() {
     }
 
     setUser(user)
-
     fetchStock(user.id)
   }
 
-  const fetchStock = async (userId) => {
+  const fetchStock = async (userId: string) => {
     const { data } = await supabase
       .from("stock_tech")
       .select(`
         quantite,
         user_id,
-        produits (
+        produits!inner (
           id,
           nom,
           reference,
@@ -37,10 +47,10 @@ export default function Home() {
       `)
       .eq("user_id", userId)
 
-    setStock(data || [])
+    setStock((data as any) || [])
   }
 
-  const creerDemande = async (item) => {
+  const creerDemande = async (item: StockItem) => {
     const { data: demandeExistante } = await supabase
       .from("demandes_stock")
       .select("*")
@@ -48,22 +58,18 @@ export default function Home() {
       .eq("produit_id", item.produits.id)
       .eq("statut", "en attente")
 
-    if (demandeExistante.length > 0) {
-      return
-    }
+    if ((demandeExistante?.length || 0) > 0) return
 
-    await supabase
-      .from("demandes_stock")
-      .insert({
-        user_id: item.user_id,
-        produit_id: item.produits.id,
-        quantite: 10,
-      })
+    await supabase.from("demandes_stock").insert({
+      user_id: item.user_id,
+      produit_id: item.produits.id,
+      quantite: 10,
+    })
 
     alert("Demande envoyée à l'admin")
   }
 
-  const utiliserProduit = async (item) => {
+  const utiliserProduit = async (item: StockItem) => {
     if (item.quantite <= 0) return
 
     const nouvelleQuantite = item.quantite - 1
@@ -76,18 +82,13 @@ export default function Home() {
       .eq("produit_id", item.produits.id)
       .eq("user_id", item.user_id)
 
-    await supabase
-      .from("mouvements_stock")
-      .insert({
-        user_id: item.user_id,
-        produit_id: item.produits.id,
-        quantite: 1,
-      })
+    await supabase.from("mouvements_stock").insert({
+      user_id: item.user_id,
+      produit_id: item.produits.id,
+      quantite: 1,
+    })
 
-    if (
-      nouvelleQuantite <=
-      item.produits.stock_minimum
-    ) {
+    if (nouvelleQuantite <= item.produits.stock_minimum) {
       await creerDemande(item)
     }
 
@@ -96,7 +97,6 @@ export default function Home() {
 
   const logout = async () => {
     await supabase.auth.signOut()
-
     window.location.href = "/login"
   }
 
@@ -111,12 +111,8 @@ export default function Home() {
       {user && (
         <div style={{ marginBottom: "20px" }}>
           Connecté : {user.email}
-
           <br />
-
-          <button onClick={logout}>
-            Déconnexion
-          </button>
+          <button onClick={logout}>Déconnexion</button>
         </div>
       )}
 
@@ -131,22 +127,14 @@ export default function Home() {
               border: "1px solid #ccc",
               padding: "10px",
               marginBottom: "10px",
-              backgroundColor: stockFaible
-                ? "#ffdddd"
-                : "white",
+              backgroundColor: stockFaible ? "#ffdddd" : "white",
             }}
           >
             <h3>{item.produits.nom}</h3>
 
             <p>Réf: {item.produits.reference}</p>
-
             <p>Quantité: {item.quantite}</p>
-
-            <p>
-              Stock minimum :
-              {" "}
-              {item.produits.stock_minimum}
-            </p>
+            <p>Stock minimum: {item.produits.stock_minimum}</p>
 
             {stockFaible && (
               <p style={{ color: "red" }}>
