@@ -8,46 +8,60 @@ export default function AdminPage() {
   const [stockGeneral, setStockGeneral] = useState<any[]>([])
   const [users, setUsers] = useState<any[]>([])
 
+  const [stockTechnicien, setStockTechnicien] =
+    useState<any[]>([])
+
+  const [selectedTechStock, setSelectedTechStock] =
+    useState("")
+
   const [nom, setNom] = useState("")
   const [reference, setReference] = useState("")
-  const [stockMinimum, setStockMinimum] = useState(10)
+  const [stockMinimum, setStockMinimum] =
+    useState(10)
 
-  const [selectedUser, setSelectedUser] = useState("")
-  const [selectedProduit, setSelectedProduit] = useState("")
+  const [selectedUser, setSelectedUser] =
+    useState("")
+
+  const [selectedProduit, setSelectedProduit] =
+    useState("")
+
   const [quantite, setQuantite] = useState(1)
 
   // FETCH DATA
   const fetchData = async () => {
     // PRODUITS
-    const { data: produitsData } = await supabase
-      .from("produits")
-      .select("*")
+    const { data: produitsData } =
+      await supabase
+        .from("produits")
+        .select("*")
 
     setProduits(produitsData || [])
 
     // STOCK GENERAL
-    const { data: stockData } = await supabase
-      .from("stock_general")
-      .select(`
-        id,
-        quantite,
-        produit_id,
-        produits (
+    const { data: stockData } =
+      await supabase
+        .from("stock_general")
+        .select(`
           id,
-          nom,
-          reference,
-          stock_minimum,
-          fournisseur,
-          lien_fournisseur
-        )
-      `)
+          quantite,
+          produit_id,
+          produits (
+            id,
+            nom,
+            reference,
+            stock_minimum,
+            fournisseur,
+            lien_fournisseur
+          )
+        `)
 
     setStockGeneral(stockData || [])
 
     // TECHNICIENS
-    const { data: usersData } = await supabase
-      .from("techniciens")
-      .select("*")
+    const { data: usersData } =
+      await supabase
+        .from("techniciens")
+        .select("*")
 
     setUsers(usersData || [])
   }
@@ -59,15 +73,16 @@ export default function AdminPage() {
       return
     }
 
-    const { data, error } = await supabase
-      .from("produits")
-      .insert({
-        nom,
-        reference,
-        stock_minimum: stockMinimum,
-      })
-      .select()
-      .single()
+    const { data, error } =
+      await supabase
+        .from("produits")
+        .insert({
+          nom,
+          reference,
+          stock_minimum: stockMinimum,
+        })
+        .select()
+        .single()
 
     if (error) {
       alert(error.message)
@@ -187,6 +202,27 @@ export default function AdminPage() {
     fetchData()
   }
 
+  // VOIR STOCK TECHNICIEN
+  const voirStockTechnicien = async (
+    userId: string
+  ) => {
+    setSelectedTechStock(userId)
+
+    const { data } = await supabase
+      .from("stock_tech")
+      .select(`
+        id,
+        quantite,
+        produits (
+          nom,
+          reference
+        )
+      `)
+      .eq("user_id", userId)
+
+    setStockTechnicien(data || [])
+  }
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -261,7 +297,8 @@ export default function AdminPage() {
           </p>
 
           {item.quantite <=
-            item.produits?.stock_minimum && (
+            item.produits
+              ?.stock_minimum && (
             <div>
               <p style={{ color: "red" }}>
                 ⚠️ Stock faible
@@ -389,6 +426,70 @@ export default function AdminPage() {
       <button onClick={attribuerMateriel}>
         Attribuer
       </button>
+
+      <hr />
+
+      <h2>
+        Voir Stock Technicien
+      </h2>
+
+      <select
+        value={selectedTechStock}
+        onChange={(e) =>
+          voirStockTechnicien(
+            e.target.value
+          )
+        }
+      >
+        <option value="">
+          Choisir technicien
+        </option>
+
+        {users.map((user) => (
+          <option
+            key={user.id}
+            value={user.id}
+          >
+            {user.email}
+          </option>
+        ))}
+      </select>
+
+      <br />
+      <br />
+
+      {stockTechnicien.map(
+        (item, index) => (
+          <div
+            key={index}
+            style={{
+              border:
+                "1px solid gray",
+              padding: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            <h3>
+              {item.produits?.nom}
+            </h3>
+
+            <p>
+              Référence :
+              {" "}
+              {
+                item.produits
+                  ?.reference
+              }
+            </p>
+
+            <p>
+              Quantité :
+              {" "}
+              {item.quantite}
+            </p>
+          </div>
+        )
+      )}
     </div>
   )
 }
