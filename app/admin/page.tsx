@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [selectedProduit, setSelectedProduit] = useState("")
   const [quantite, setQuantite] = useState(1)
 
+  // FETCH DATA
   const fetchData = async () => {
     // PRODUITS
     const { data: produitsData } = await supabase
@@ -43,10 +44,12 @@ export default function AdminPage() {
 
     setStockGeneral(stockData || [])
 
-    // USERS
-    const { data } = await supabase.auth.admin.listUsers()
+    // TECHNICIENS
+    const { data: usersData } = await supabase
+      .from("techniciens")
+      .select("*")
 
-    setUsers(data?.users || [])
+    setUsers(usersData || [])
   }
 
   // AJOUT PRODUIT
@@ -71,7 +74,7 @@ export default function AdminPage() {
       return
     }
 
-    // création stock général auto
+    // CREER STOCK GENERAL
     await supabase
       .from("stock_general")
       .insert({
@@ -88,9 +91,13 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // MODIFIER STOCK GENERAL
-  const modifierStock = async (item: any, valeur: number) => {
-    const nouvelleQuantite = item.quantite + valeur
+  // MODIFIER STOCK
+  const modifierStock = async (
+    item: any,
+    valeur: number
+  ) => {
+    const nouvelleQuantite =
+      item.quantite + valeur
 
     if (nouvelleQuantite < 0) {
       alert("Impossible")
@@ -109,53 +116,69 @@ export default function AdminPage() {
 
   // ATTRIBUER MATERIEL
   const attribuerMateriel = async () => {
-    if (!selectedUser || !selectedProduit || quantite <= 0) {
+    if (
+      !selectedUser ||
+      !selectedProduit ||
+      quantite <= 0
+    ) {
       alert("Champs invalides")
       return
     }
 
-    const stockGeneralItem = stockGeneral.find(
-      (s) => s.produit_id === selectedProduit
-    )
+    const stockGeneralItem =
+      stockGeneral.find(
+        (s) =>
+          s.produit_id === selectedProduit
+      )
 
     if (!stockGeneralItem) {
       alert("Produit absent")
       return
     }
 
-    if (stockGeneralItem.quantite < quantite) {
+    if (
+      stockGeneralItem.quantite < quantite
+    ) {
       alert("Stock insuffisant")
       return
     }
 
-    // vérifier stock tech existant
-    const { data: stockTech } = await supabase
-      .from("stock_tech")
-      .select("*")
-      .eq("user_id", selectedUser)
-      .eq("produit_id", selectedProduit)
-      .single()
+    // STOCK TECH EXISTANT
+    const { data: stockTech } =
+      await supabase
+        .from("stock_tech")
+        .select("*")
+        .eq("user_id", selectedUser)
+        .eq("produit_id", selectedProduit)
+        .single()
 
     if (stockTech) {
+      // UPDATE
       await supabase
         .from("stock_tech")
         .update({
-          quantite: stockTech.quantite + quantite,
+          quantite:
+            stockTech.quantite + quantite,
         })
         .eq("id", stockTech.id)
     } else {
-      await supabase.from("stock_tech").insert({
-        user_id: selectedUser,
-        produit_id: selectedProduit,
-        quantite,
-      })
+      // INSERT
+      await supabase
+        .from("stock_tech")
+        .insert({
+          user_id: selectedUser,
+          produit_id: selectedProduit,
+          quantite,
+        })
     }
 
-    // retirer stock général
+    // RETIRER STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
-        quantite: stockGeneralItem.quantite - quantite,
+        quantite:
+          stockGeneralItem.quantite -
+          quantite,
       })
       .eq("id", stockGeneralItem.id)
 
@@ -179,27 +202,38 @@ export default function AdminPage() {
       <input
         placeholder="Nom"
         value={nom}
-        onChange={(e) => setNom(e.target.value)}
+        onChange={(e) =>
+          setNom(e.target.value)
+        }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         placeholder="Référence"
         value={reference}
-        onChange={(e) => setReference(e.target.value)}
+        onChange={(e) =>
+          setReference(e.target.value)
+        }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         type="number"
         placeholder="Stock minimum"
         value={stockMinimum}
-        onChange={(e) => setStockMinimum(Number(e.target.value))}
+        onChange={(e) =>
+          setStockMinimum(
+            Number(e.target.value)
+          )
+        }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <button onClick={ajouterProduit}>
         Ajouter Produit
@@ -218,29 +252,70 @@ export default function AdminPage() {
             marginBottom: "10px",
           }}
         >
-          <h3>{item.produits?.nom}</h3>
+          <h3>
+            {item.produits?.nom}
+          </h3>
 
-          <p>Stock : {item.quantite}</p>
+          <p>
+            Stock : {item.quantite}
+          </p>
 
-          {item.quantite <= item.produits?.stock_minimum && (
+          {item.quantite <=
+            item.produits?.stock_minimum && (
             <div>
-              <p style={{ color: "red" }}>⚠️ Stock faible</p>
+              <p style={{ color: "red" }}>
+                ⚠️ Stock faible
+              </p>
 
               <a
-                href={item.produits?.lien_fournisseur}
+                href={
+                  item.produits
+                    ?.lien_fournisseur
+                }
                 target="_blank"
               >
                 <button>
-                  Commander chez {item.produits?.fournisseur}
+                  Commander chez{" "}
+                  {
+                    item.produits
+                      ?.fournisseur
+                  }
                 </button>
               </a>
             </div>
           )}
 
-          <button onClick={() => modifierStock(item, 1)}>+1</button>
-          <button onClick={() => modifierStock(item, 10)}>+10</button>
-          <button onClick={() => modifierStock(item, -1)}>-1</button>
-          <button onClick={() => modifierStock(item, -10)}>-10</button>
+          <button
+            onClick={() =>
+              modifierStock(item, 1)
+            }
+          >
+            +1
+          </button>
+
+          <button
+            onClick={() =>
+              modifierStock(item, 10)
+            }
+          >
+            +10
+          </button>
+
+          <button
+            onClick={() =>
+              modifierStock(item, -1)
+            }
+          >
+            -1
+          </button>
+
+          <button
+            onClick={() =>
+              modifierStock(item, -10)
+            }
+          >
+            -10
+          </button>
         </div>
       ))}
 
@@ -250,41 +325,66 @@ export default function AdminPage() {
 
       <select
         value={selectedUser}
-        onChange={(e) => setSelectedUser(e.target.value)}
+        onChange={(e) =>
+          setSelectedUser(
+            e.target.value
+          )
+        }
       >
-        <option value="">Choisir technicien</option>
+        <option value="">
+          Choisir technicien
+        </option>
 
-        {users.map((user: any) => (
-          <option key={user.id} value={user.id}>
+        {users.map((user) => (
+          <option
+            key={user.id}
+            value={user.id}
+          >
             {user.email}
           </option>
         ))}
       </select>
 
-      <br /><br />
+      <br />
+      <br />
 
       <select
         value={selectedProduit}
-        onChange={(e) => setSelectedProduit(e.target.value)}
+        onChange={(e) =>
+          setSelectedProduit(
+            e.target.value
+          )
+        }
       >
-        <option value="">Choisir produit</option>
+        <option value="">
+          Choisir produit
+        </option>
 
-        {produits.map((produit: any) => (
-          <option key={produit.id} value={produit.id}>
+        {produits.map((produit) => (
+          <option
+            key={produit.id}
+            value={produit.id}
+          >
             {produit.nom}
           </option>
         ))}
       </select>
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         type="number"
         value={quantite}
-        onChange={(e) => setQuantite(Number(e.target.value))}
+        onChange={(e) =>
+          setQuantite(
+            Number(e.target.value)
+          )
+        }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <button onClick={attribuerMateriel}>
         Attribuer
