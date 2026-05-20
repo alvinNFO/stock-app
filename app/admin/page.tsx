@@ -14,8 +14,12 @@ export default function AdminPage() {
   const [selectedTechStock, setSelectedTechStock] =
     useState("")
 
+  const [selectedCategorie, setSelectedCategorie] =
+    useState("")
+
   const [nom, setNom] = useState("")
   const [reference, setReference] = useState("")
+  const [categorie, setCategorie] = useState("")
   const [stockMinimum, setStockMinimum] =
     useState(10)
 
@@ -49,6 +53,7 @@ export default function AdminPage() {
             id,
             nom,
             reference,
+            categorie,
             stock_minimum,
             fournisseur,
             lien_fournisseur
@@ -79,6 +84,7 @@ export default function AdminPage() {
         .insert({
           nom,
           reference,
+          categorie,
           stock_minimum: stockMinimum,
         })
         .select()
@@ -101,6 +107,7 @@ export default function AdminPage() {
 
     setNom("")
     setReference("")
+    setCategorie("")
     setStockMinimum(10)
 
     fetchData()
@@ -258,6 +265,17 @@ export default function AdminPage() {
       <br />
 
       <input
+        placeholder="Catégorie"
+        value={categorie}
+        onChange={(e) =>
+          setCategorie(e.target.value)
+        }
+      />
+
+      <br />
+      <br />
+
+      <input
         type="number"
         placeholder="Stock minimum"
         value={stockMinimum}
@@ -277,84 +295,153 @@ export default function AdminPage() {
 
       <hr />
 
+      <h2>Filtrer par catégorie</h2>
+
+      <select
+        value={selectedCategorie}
+        onChange={(e) =>
+          setSelectedCategorie(
+            e.target.value
+          )
+        }
+      >
+        <option value="">
+          Toutes catégories
+        </option>
+
+        {[...new Set(
+          produits.map(
+            (p) => p.categorie
+          )
+        )].map((cat, index) => (
+          <option
+            key={index}
+            value={cat}
+          >
+            {cat}
+          </option>
+        ))}
+      </select>
+
+      <br />
+      <br />
+
       <h2>Gestion Stock Général</h2>
 
-      {stockGeneral.map((item, index) => (
-        <div
-          key={index}
-          style={{
-            border: "1px solid blue",
-            padding: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          <h3>
-            {item.produits?.nom}
-          </h3>
+      {stockGeneral
+        .filter((item) => {
+          if (!selectedCategorie)
+            return true
 
-          <p>
-            Stock : {item.quantite}
-          </p>
-
-          {item.quantite <=
+          return (
             item.produits
-              ?.stock_minimum && (
-            <div>
-              <p style={{ color: "red" }}>
-                ⚠️ Stock faible
-              </p>
+              ?.categorie ===
+            selectedCategorie
+          )
+        })
+        .map((item, index) => (
+          <div
+            key={index}
+            style={{
+              border: "1px solid blue",
+              padding: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            <h3>
+              {item.produits?.nom}
+            </h3>
 
-              <a
-                href={
-                  item.produits
-                    ?.lien_fournisseur
-                }
-                target="_blank"
-              >
-                <button>
-                  Commander chez{" "}
-                  {
+            <p>
+              Catégorie :
+              {" "}
+              {
+                item.produits
+                  ?.categorie
+              }
+            </p>
+
+            <p>
+              Stock :
+              {" "}
+              {item.quantite}
+            </p>
+
+            {item.quantite <=
+              item.produits
+                ?.stock_minimum && (
+              <div>
+                <p
+                  style={{
+                    color: "red",
+                  }}
+                >
+                  ⚠️ Stock faible
+                </p>
+
+                <a
+                  href={
                     item.produits
-                      ?.fournisseur
+                      ?.lien_fournisseur
                   }
-                </button>
-              </a>
-            </div>
-          )}
+                  target="_blank"
+                >
+                  <button>
+                    Commander chez{" "}
+                    {
+                      item.produits
+                        ?.fournisseur
+                    }
+                  </button>
+                </a>
+              </div>
+            )}
 
-          <button
-            onClick={() =>
-              modifierStock(item, 1)
-            }
-          >
-            +1
-          </button>
+            <button
+              onClick={() =>
+                modifierStock(
+                  item,
+                  1
+                )
+              }
+            >
+              +1
+            </button>
 
-          <button
-            onClick={() =>
-              modifierStock(item, 10)
-            }
-          >
-            +10
-          </button>
+            <button
+              onClick={() =>
+                modifierStock(
+                  item,
+                  10
+                )
+              }
+            >
+              +10
+            </button>
 
-          <button
-            onClick={() =>
-              modifierStock(item, -1)
-            }
-          >
-            -1
-          </button>
+            <button
+              onClick={() =>
+                modifierStock(
+                  item,
+                  -1
+                )
+              }
+            >
+              -1
+            </button>
 
-          <button
-            onClick={() =>
-              modifierStock(item, -10)
-            }
-          >
-            -10
-          </button>
-        </div>
-      ))}
+            <button
+              onClick={() =>
+                modifierStock(
+                  item,
+                  -10
+                )
+              }
+            >
+              -10
+            </button>
+          </div>
+        ))}
 
       <hr />
 
