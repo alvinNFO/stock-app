@@ -1,44 +1,72 @@
 "use client"
 
-import Link from "next/link"
+import { useState } from "react"
+import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
-export default function Home() {
+export default function LoginPage() {
+  const router = useRouter()
+
+  const [email, setEmail] = useState("")
+  const [password, setPassword] =
+    useState("")
+
+  const login = async () => {
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    // ADMIN
+    if (
+      email ===
+      "admin@test.com"
+    ) {
+      router.push("/admin")
+    } else {
+      router.push("/tech")
+    }
+  }
+
   return (
-    <div
-      style={{
-        padding: "40px",
-        textAlign: "center",
-      }}
-    >
-      <h1>
-        Application Stock
-      </h1>
+    <div style={{ padding: "20px" }}>
+      <h1>Connexion</h1>
 
-      <br />
-
-      <Link href="/login">
-        <button>
-          Connexion
-        </button>
-      </Link>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) =>
+          setEmail(e.target.value)
+        }
+      />
 
       <br />
       <br />
 
-      <Link href="/tech">
-        <button>
-          Accès Technicien
-        </button>
-      </Link>
+      <input
+        type="password"
+        placeholder="Mot de passe"
+        value={password}
+        onChange={(e) =>
+          setPassword(
+            e.target.value
+          )
+        }
+      />
 
       <br />
       <br />
 
-      <Link href="/admin">
-        <button>
-          Accès Admin
-        </button>
-      </Link>
+      <button onClick={login}>
+        Se connecter
+      </button>
     </div>
   )
 }
