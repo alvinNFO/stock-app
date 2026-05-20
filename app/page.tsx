@@ -3,151 +3,136 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
-type StockItem = {
-  quantite: number
-  user_id: string
-  produits: {
-    id: string
-    nom: string
-    reference: string
-    stock_minimum: number
-  }
-}
-
 export default function Home() {
-  const [stock, setStock] = useState<StockItem[]>([])
-  const [user, setUser] = useState<any>(null)
+  const [stocks, setStocks] = useState<any[]>([])
+  const [selectedCategorie, setSelectedCategorie] =
+    useState("")
 
-  const fetchUser = async () => {
+  const fetchStock = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-      window.location.href = "/login"
+      alert("Non connecté")
       return
     }
 
-    setUser(user)
-    fetchStock(user.id)
-  }
-
-  const fetchStock = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("stock_tech")
       .select(`
+        id,
         quantite,
-        user_id,
-        produits!inner (
-          id,
+        produits (
           nom,
           reference,
-          stock_minimum
+          categorie
         )
       `)
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
 
-    setStock((data as any) || [])
-  }
-
-  const creerDemande = async (item: StockItem) => {
-    const { data: demandeExistante } = await supabase
-      .from("demandes_stock")
-      .select("*")
-      .eq("user_id", item.user_id)
-      .eq("produit_id", item.produits.id)
-      .eq("statut", "en attente")
-
-    if ((demandeExistante?.length || 0) > 0) return
-
-    await supabase.from("demandes_stock").insert({
-      user_id: item.user_id,
-      produit_id: item.produits.id,
-      quantite: 10,
-    })
-
-    alert("Demande envoyée à l'admin")
-  }
-
-  const utiliserProduit = async (item: StockItem) => {
-    if (item.quantite <= 0) return
-
-    const nouvelleQuantite = item.quantite - 1
-
-    await supabase
-      .from("stock_tech")
-      .update({
-        quantite: nouvelleQuantite,
-      })
-      .eq("produit_id", item.produits.id)
-      .eq("user_id", item.user_id)
-
-    await supabase.from("mouvements_stock").insert({
-      user_id: item.user_id,
-      produit_id: item.produits.id,
-      quantite: 1,
-    })
-
-    if (nouvelleQuantite <= item.produits.stock_minimum) {
-      await creerDemande(item)
+    if (error) {
+      console.log(error)
+      return
     }
 
-    fetchStock(item.user_id)
-  }
-
-  const logout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = "/login"
+    setStocks(data || [])
   }
 
   useEffect(() => {
-    fetchUser()
+    fetchStock()
   }, [])
 
   return (
     <div style={{ padding: "20px" }}>
       <h1>Stock Technicien</h1>
 
-      {user && (
-        <div style={{ marginBottom: "20px" }}>
-          Connecté : {user.email}
-          <br />
-          <button onClick={logout}>Déconnexion</button>
-        </div>
-      )}
+      <hr />
 
-      {stock.map((item, index) => {
-        const stockFaible =
-          item.quantite <= item.produits.stock_minimum
+      <h2>
+        Filtrer par catégorie
+      </h2>
 
-        return (
+      <select
+        value={selectedCategorie}
+        onChange={(e) =>
+          setSelectedCategorie(
+            e.target.value
+          )
+        }
+      >
+        <option value="">
+          Toutes catégories
+        </option>
+
+        {[...new Set(
+          stocks.map(
+            (s) =>
+              s.produits?.categorie
+          )
+        )].map((cat, index) => (
+          <option
+            key={index}
+            value={cat}
+          >
+            {cat}
+          </option>
+        ))}
+      </select>
+
+      <br />
+      <br />
+
+      {stocks
+        .filter((item) => {
+          if (!selectedCategorie)
+            return true
+
+          return (
+            item.produits
+              ?.categorie ===
+            selectedCategorie
+          )
+        })
+        .map((item, index) => (
           <div
             key={index}
             style={{
-              border: "1px solid #ccc",
+              border:
+                "1px solid black",
               padding: "10px",
               marginBottom: "10px",
-              backgroundColor: stockFaible ? "#ffdddd" : "white",
             }}
           >
-            <h3>{item.produits.nom}</h3>
+            <h3>
+              {item.produits?.nom}
+            </h3>
 
-            <p>Réf: {item.produits.reference}</p>
-            <p>Quantité: {item.quantite}</p>
-            <p>Stock minimum: {item.produits.stock_minimum}</p>
+            <p>
+              Référence :
+              {" "}
+              {
+                item.produits
+                  ?.reference
+              }
+            </p>
 
-            {stockFaible && (
-              <p style={{ color: "red" }}>
-                ⚠️ Stock faible
-              </p>
-            )}
+            <p>
+              Catégorie :
+              {" "}
+              {
+                item.produits
+                  ?.categorie
+              }
+            </p>
 
-            <button onClick={() => utiliserProduit(item)}>
-              Utiliser 1
-            </button>
+            <p>
+              Quantité :
+              {" "}
+              {item.quantite}
+            </p>
           </div>
-        )
-      })}
+        ))}
     </div>
   )
 }
