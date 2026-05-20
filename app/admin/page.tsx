@@ -34,7 +34,7 @@ export default function AdminPage() {
 
   const [quantite, setQuantite] = useState(1)
 
-  // FETCH
+  // FETCH DATA
   const fetchData = async () => {
     // PRODUITS
     const { data: produitsData } =
@@ -65,7 +65,7 @@ export default function AdminPage() {
 
     setStockGeneral(stockData || [])
 
-    // TECHNICIENS
+    // USERS
     const { data: usersData } =
       await supabase
         .from("techniciens")
@@ -74,36 +74,54 @@ export default function AdminPage() {
     setUsers(usersData || [])
 
     // DEMANDES
-    const { data: demandesData } =
-      await supabase
-        .from("demandes_stock")
-        .select(`
-          id,
-          quantite_demandee,
-          status,
-          produit_id,
-          user_id,
-          produits (
-            nom
-          )
-        `)
-        .eq("status", "en_attente")
+    const {
+      data: demandesData,
+      error,
+    } = await supabase
+      .from("demandes_stock")
+      .select(`
+        *,
+        produits (
+          nom
+        )
+      `)
+
+    console.log(
+      "DEMANDES :",
+      demandesData
+    )
+
+    console.log(
+      "ERREUR DEMANDES :",
+      error
+    )
 
     setDemandes(demandesData || [])
   }
 
   // AJOUT PRODUIT
   const ajouterProduit = async () => {
-    const { data } = await supabase
-      .from("produits")
-      .insert({
-        nom,
-        reference,
-        categorie,
-        stock_minimum: stockMinimum,
-      })
-      .select()
-      .single()
+    if (!nom || !reference) {
+      alert("Remplir les champs")
+      return
+    }
+
+    const { data, error } =
+      await supabase
+        .from("produits")
+        .insert({
+          nom,
+          reference,
+          categorie,
+          stock_minimum: stockMinimum,
+        })
+        .select()
+        .single()
+
+    if (error) {
+      alert(error.message)
+      return
+    }
 
     await supabase
       .from("stock_general")
@@ -111,6 +129,13 @@ export default function AdminPage() {
         produit_id: data.id,
         quantite: 0,
       })
+
+    alert("Produit ajouté")
+
+    setNom("")
+    setReference("")
+    setCategorie("")
+    setStockMinimum(10)
 
     fetchData()
   }
@@ -123,7 +148,10 @@ export default function AdminPage() {
     const nouvelleQuantite =
       item.quantite + valeur
 
-    if (nouvelleQuantite < 0) return
+    if (nouvelleQuantite < 0) {
+      alert("Impossible")
+      return
+    }
 
     await supabase
       .from("stock_general")
@@ -137,14 +165,34 @@ export default function AdminPage() {
 
   // ATTRIBUER MATERIEL
   const attribuerMateriel = async () => {
+    if (
+      !selectedUser ||
+      !selectedProduit ||
+      quantite <= 0
+    ) {
+      alert("Champs invalides")
+      return
+    }
+
     const stockGeneralItem =
       stockGeneral.find(
         (s) =>
           s.produit_id === selectedProduit
       )
 
-    if (!stockGeneralItem) return
+    if (!stockGeneralItem) {
+      alert("Produit absent")
+      return
+    }
 
+    if (
+      stockGeneralItem.quantite < quantite
+    ) {
+      alert("Stock insuffisant")
+      return
+    }
+
+    // STOCK TECH
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -171,6 +219,7 @@ export default function AdminPage() {
         })
     }
 
+    // RETIRER STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
@@ -179,6 +228,8 @@ export default function AdminPage() {
           quantite,
       })
       .eq("id", stockGeneralItem.id)
+
+    alert("Matériel attribué")
 
     fetchData()
   }
@@ -439,6 +490,12 @@ export default function AdminPage() {
                   ?.nom
               }
             </h3>
+
+            <p>
+              Status :
+              {" "}
+              {demande.status}
+            </p>
 
             <p>
               Quantité demandée :
