@@ -34,6 +34,9 @@ export default function AdminPage() {
 
   const [quantite, setQuantite] = useState(1)
 
+  const [quantitesDemandes, setQuantitesDemandes] =
+    useState<any>({})
+
   // FETCH DATA
   const fetchData = async () => {
     // PRODUITS
@@ -74,27 +77,16 @@ export default function AdminPage() {
     setUsers(usersData || [])
 
     // DEMANDES
-    const {
-      data: demandesData,
-      error,
-    } = await supabase
-      .from("demandes_stock")
-      .select(`
-        *,
-        produits (
-          nom
-        )
-      `)
-
-    console.log(
-      "DEMANDES :",
-      demandesData
-    )
-
-    console.log(
-      "ERREUR DEMANDES :",
-      error
-    )
+    const { data: demandesData } =
+      await supabase
+        .from("demandes_stock")
+        .select(`
+          *,
+          produits (
+            nom
+          )
+        `)
+        .eq("status", "en_attente")
 
     setDemandes(demandesData || [])
   }
@@ -192,7 +184,6 @@ export default function AdminPage() {
       return
     }
 
-    // STOCK TECH
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -219,7 +210,6 @@ export default function AdminPage() {
         })
     }
 
-    // RETIRER STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
@@ -234,10 +224,22 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // VALIDER DEMANDE
-  const validerDemande = async (
+  // ACCEPTER DEMANDE
+  const accepterDemande = async (
     demande: any
   ) => {
+    const quantiteAEnvoyer =
+      Number(
+        quantitesDemandes[
+          demande.id
+        ]
+      ) || 0
+
+    if (quantiteAEnvoyer <= 0) {
+      alert("Quantité invalide")
+      return
+    }
+
     const stockGeneralItem =
       stockGeneral.find(
         (s) =>
@@ -252,13 +254,13 @@ export default function AdminPage() {
 
     if (
       stockGeneralItem.quantite <
-      demande.quantite_demandee
+      quantiteAEnvoyer
     ) {
       alert("Stock insuffisant")
       return
     }
 
-    // STOCK TECH
+    // VERIFIER STOCK TECH
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -271,23 +273,35 @@ export default function AdminPage() {
         .single()
 
     if (stockTech) {
+      // UPDATE
       await supabase
         .from("stock_tech")
         .update({
           quantite:
             stockTech.quantite +
-            demande.quantite_demandee,
+            quantiteAEnvoyer,
         })
         .eq("id", stockTech.id)
+    } else {
+      // INSERT
+      await supabase
+        .from("stock_tech")
+        .insert({
+          user_id: demande.user_id,
+          produit_id:
+            demande.produit_id,
+          quantite:
+            quantiteAEnvoyer,
+        })
     }
 
-    // RETIRER STOCK GENERAL
+    // RETIRER DU STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
         quantite:
           stockGeneralItem.quantite -
-          demande.quantite_demandee,
+          quantiteAEnvoyer,
       })
       .eq("id", stockGeneralItem.id)
 
@@ -299,7 +313,7 @@ export default function AdminPage() {
       })
       .eq("id", demande.id)
 
-    alert("Demande validée")
+    alert("Demande acceptée")
 
     fetchData()
   }
@@ -492,12 +506,6 @@ export default function AdminPage() {
             </h3>
 
             <p>
-              Status :
-              {" "}
-              {demande.status}
-            </p>
-
-            <p>
               Quantité demandée :
               {" "}
               {
@@ -505,14 +513,34 @@ export default function AdminPage() {
               }
             </p>
 
+            <input
+              type="number"
+              placeholder="Quantité à donner"
+              value={
+                quantitesDemandes[
+                  demande.id
+                ] || ""
+              }
+              onChange={(e) =>
+                setQuantitesDemandes({
+                  ...quantitesDemandes,
+                  [demande.id]:
+                    e.target.value,
+                })
+              }
+            />
+
+            <br />
+            <br />
+
             <button
               onClick={() =>
-                validerDemande(
+                accepterDemande(
                   demande
                 )
               }
             >
-              Valider
+              Accepter demande
             </button>
           </div>
         )
