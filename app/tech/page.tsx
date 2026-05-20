@@ -2,19 +2,23 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
-export default function Home() {
+export default function TechPage() {
+  const router = useRouter()
+
   const [stocks, setStocks] = useState<any[]>([])
   const [selectedCategorie, setSelectedCategorie] =
     useState("")
 
+  // CHARGER STOCK
   const fetchStock = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-      alert("Non connecté")
+      router.push("/")
       return
     }
 
@@ -23,7 +27,9 @@ export default function Home() {
       .select(`
         id,
         quantite,
+        produit_id,
         produits (
+          id,
           nom,
           reference,
           categorie
@@ -39,6 +45,36 @@ export default function Home() {
     setStocks(data || [])
   }
 
+  // MODIFIER QUANTITE
+  const modifierQuantite = async (
+    item: any,
+    valeur: number
+  ) => {
+    const nouvelleQuantite =
+      item.quantite + valeur
+
+    if (nouvelleQuantite < 0) {
+      alert("Impossible")
+      return
+    }
+
+    await supabase
+      .from("stock_tech")
+      .update({
+        quantite: nouvelleQuantite,
+      })
+      .eq("id", item.id)
+
+    fetchStock()
+  }
+
+  // DECONNEXION
+  const logout = async () => {
+    await supabase.auth.signOut()
+
+    router.push("/")
+  }
+
   useEffect(() => {
     fetchStock()
   }, [])
@@ -46,6 +82,10 @@ export default function Home() {
   return (
     <div style={{ padding: "20px" }}>
       <h1>Stock Technicien</h1>
+
+      <button onClick={logout}>
+        Déconnexion
+      </button>
 
       <hr />
 
@@ -131,6 +171,28 @@ export default function Home() {
               {" "}
               {item.quantite}
             </p>
+
+            <button
+              onClick={() =>
+                modifierQuantite(
+                  item,
+                  -1
+                )
+              }
+            >
+              -1
+            </button>
+
+            <button
+              onClick={() =>
+                modifierQuantite(
+                  item,
+                  -10
+                )
+              }
+            >
+              -10
+            </button>
           </div>
         ))}
     </div>
