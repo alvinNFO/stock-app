@@ -33,7 +33,6 @@ export default function AdminPage() {
 
   // FETCH DATA
   const fetchData = async () => {
-    // PRODUITS
     const { data: produitsData } =
       await supabase
         .from("produits")
@@ -41,7 +40,6 @@ export default function AdminPage() {
 
     setProduits(produitsData || [])
 
-    // STOCK GENERAL
     const { data: stockData } =
       await supabase
         .from("stock_general")
@@ -62,7 +60,6 @@ export default function AdminPage() {
 
     setStockGeneral(stockData || [])
 
-    // TECHNICIENS
     const { data: usersData } =
       await supabase
         .from("techniciens")
@@ -95,7 +92,6 @@ export default function AdminPage() {
       return
     }
 
-    // CREER STOCK GENERAL
     await supabase
       .from("stock_general")
       .insert({
@@ -136,6 +132,21 @@ export default function AdminPage() {
     fetchData()
   }
 
+  // MODIFIER CATEGORIE
+  const modifierCategorie = async (
+    produitId: string,
+    nouvelleCategorie: string
+  ) => {
+    await supabase
+      .from("produits")
+      .update({
+        categorie: nouvelleCategorie,
+      })
+      .eq("id", produitId)
+
+    fetchData()
+  }
+
   // ATTRIBUER MATERIEL
   const attribuerMateriel = async () => {
     if (
@@ -165,7 +176,6 @@ export default function AdminPage() {
       return
     }
 
-    // STOCK TECH EXISTANT
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -175,7 +185,6 @@ export default function AdminPage() {
         .single()
 
     if (stockTech) {
-      // UPDATE
       await supabase
         .from("stock_tech")
         .update({
@@ -184,7 +193,6 @@ export default function AdminPage() {
         })
         .eq("id", stockTech.id)
     } else {
-      // INSERT
       await supabase
         .from("stock_tech")
         .insert({
@@ -194,7 +202,6 @@ export default function AdminPage() {
         })
     }
 
-    // RETIRER STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
@@ -353,7 +360,13 @@ export default function AdminPage() {
             </h3>
 
             <p>
-              Catégorie :
+              Stock :
+              {" "}
+              {item.quantite}
+            </p>
+
+            <p>
+              Catégorie actuelle :
               {" "}
               {
                 item.produits
@@ -361,11 +374,22 @@ export default function AdminPage() {
               }
             </p>
 
-            <p>
-              Stock :
-              {" "}
-              {item.quantite}
-            </p>
+            <input
+              placeholder="Modifier catégorie"
+              defaultValue={
+                item.produits
+                  ?.categorie
+              }
+              onBlur={(e) =>
+                modifierCategorie(
+                  item.produits.id,
+                  e.target.value
+                )
+              }
+            />
+
+            <br />
+            <br />
 
             {item.quantite <=
               item.produits
