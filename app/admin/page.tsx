@@ -13,6 +13,12 @@ export default function AdminPage() {
   const [demandes, setDemandes] =
     useState<any[]>([])
 
+  const [stockTechnicien, setStockTechnicien] =
+    useState<any[]>([])
+
+  const [selectedTechStock, setSelectedTechStock] =
+    useState("")
+
   const [showStocks, setShowStocks] =
     useState(true)
 
@@ -60,9 +66,7 @@ export default function AdminPage() {
             nom,
             reference,
             categorie,
-            stock_minimum,
-            fournisseur,
-            lien_fournisseur
+            stock_minimum
           )
         `)
 
@@ -94,6 +98,26 @@ export default function AdminPage() {
       )
 
     setDemandes(demandesEnAttente)
+  }
+
+  // VOIR STOCK TECHNICIEN
+  const voirStockTechnicien = async (
+    userId: string
+  ) => {
+    setSelectedTechStock(userId)
+
+    const { data } = await supabase
+      .from("stock_tech")
+      .select(`
+        *,
+        produits (
+          nom,
+          categorie
+        )
+      `)
+      .eq("user_id", userId)
+
+    setStockTechnicien(data || [])
   }
 
   // AJOUT PRODUIT
@@ -308,12 +332,10 @@ export default function AdminPage() {
       })
       .eq("id", stockGeneralItem.id)
 
-    // VALIDER DEMANDE
+    // SUPPRIMER DEMANDE
     await supabase
       .from("demandes_stock")
-      .update({
-        status: "validee",
-      })
+      .delete()
       .eq("id", demande.id)
 
     alert("Demande acceptée")
@@ -341,8 +363,7 @@ export default function AdminPage() {
         }
       />
 
-      <br />
-      <br />
+      <br /><br />
 
       <input
         placeholder="Référence"
@@ -352,8 +373,7 @@ export default function AdminPage() {
         }
       />
 
-      <br />
-      <br />
+      <br /><br />
 
       <input
         placeholder="Catégorie"
@@ -363,8 +383,7 @@ export default function AdminPage() {
         }
       />
 
-      <br />
-      <br />
+      <br /><br />
 
       <input
         type="number"
@@ -376,8 +395,7 @@ export default function AdminPage() {
         }
       />
 
-      <br />
-      <br />
+      <br /><br />
 
       <button onClick={ajouterProduit}>
         Ajouter Produit
@@ -533,8 +551,7 @@ export default function AdminPage() {
               }
             />
 
-            <br />
-            <br />
+            <br /><br />
 
             <button
               onClick={() =>
@@ -545,6 +562,71 @@ export default function AdminPage() {
             >
               Accepter demande
             </button>
+          </div>
+        )
+      )}
+
+      <hr />
+
+      <h2>
+        Voir Stock Technicien
+      </h2>
+
+      <select
+        value={selectedTechStock}
+        onChange={(e) =>
+          voirStockTechnicien(
+            e.target.value
+          )
+        }
+      >
+        <option value="">
+          Choisir technicien
+        </option>
+
+        {users.map((user) => (
+          <option
+            key={user.id}
+            value={user.id}
+          >
+            {user.email}
+          </option>
+        ))}
+      </select>
+
+      <br /><br />
+
+      {stockTechnicien.map(
+        (item, index) => (
+          <div
+            key={index}
+            style={{
+              border:
+                "1px solid green",
+              padding: "10px",
+              marginBottom: "10px",
+            }}
+          >
+            <h3>
+              {
+                item.produits?.nom
+              }
+            </h3>
+
+            <p>
+              Catégorie :
+              {" "}
+              {
+                item.produits
+                  ?.categorie
+              }
+            </p>
+
+            <p>
+              Quantité :
+              {" "}
+              {item.quantite}
+            </p>
           </div>
         )
       )}
@@ -575,8 +657,7 @@ export default function AdminPage() {
         ))}
       </select>
 
-      <br />
-      <br />
+      <br /><br />
 
       <select
         value={selectedProduit}
@@ -600,8 +681,7 @@ export default function AdminPage() {
         ))}
       </select>
 
-      <br />
-      <br />
+      <br /><br />
 
       <input
         type="number"
@@ -613,8 +693,7 @@ export default function AdminPage() {
         }
       />
 
-      <br />
-      <br />
+      <br /><br />
 
       <button onClick={attribuerMateriel}>
         Attribuer
