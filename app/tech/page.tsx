@@ -11,7 +11,7 @@ export default function TechPage() {
   const [selectedCategorie, setSelectedCategorie] =
     useState("")
 
-  // CHARGER STOCK
+  // FETCH STOCK
   const fetchStock = async () => {
     const {
       data: { user },
@@ -28,11 +28,13 @@ export default function TechPage() {
         id,
         quantite,
         produit_id,
+        user_id,
         produits (
           id,
           nom,
           reference,
-          categorie
+          categorie,
+          stock_minimum
         )
       `)
       .eq("user_id", user.id)
@@ -58,6 +60,7 @@ export default function TechPage() {
       return
     }
 
+    // UPDATE STOCK TECH
     await supabase
       .from("stock_tech")
       .update({
@@ -65,10 +68,47 @@ export default function TechPage() {
       })
       .eq("id", item.id)
 
+    // SI STOCK FAIBLE
+    if (
+      nouvelleQuantite <=
+      item.produits.stock_minimum
+    ) {
+      // VERIFIER SI DEMANDE EXISTE
+      const { data: existing } =
+        await supabase
+          .from("demandes_stock")
+          .select("*")
+          .eq("user_id", item.user_id)
+          .eq(
+            "produit_id",
+            item.produit_id
+          )
+          .eq("status", "en_attente")
+
+      if (
+        !existing ||
+        existing.length === 0
+      ) {
+        await supabase
+          .from("demandes_stock")
+          .insert({
+            user_id: item.user_id,
+            produit_id:
+              item.produit_id,
+            quantite_demandee: 10,
+            status: "en_attente",
+          })
+
+        alert(
+          "Demande envoyée à l'admin"
+        )
+      }
+    }
+
     fetchStock()
   }
 
-  // DECONNEXION
+  // LOGOUT
   const logout = async () => {
     await supabase.auth.signOut()
 
@@ -171,6 +211,18 @@ export default function TechPage() {
               {" "}
               {item.quantite}
             </p>
+
+            {item.quantite <=
+              item.produits
+                ?.stock_minimum && (
+              <p
+                style={{
+                  color: "red",
+                }}
+              >
+                ⚠️ Stock faible
+              </p>
+            )}
 
             <button
               onClick={() =>
