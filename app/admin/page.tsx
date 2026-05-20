@@ -68,7 +68,7 @@ export default function AdminPage() {
 
     setStockGeneral(stockData || [])
 
-    // USERS
+    // TECHNICIENS
     const { data: usersData } =
       await supabase
         .from("techniciens")
@@ -86,9 +86,14 @@ export default function AdminPage() {
             nom
           )
         `)
-        .eq("status", "en_attente")
 
-    setDemandes(demandesData || [])
+    const demandesEnAttente =
+      (demandesData || []).filter(
+        (d: any) =>
+          d.status !== "validee"
+      )
+
+    setDemandes(demandesEnAttente)
   }
 
   // AJOUT PRODUIT
@@ -260,7 +265,7 @@ export default function AdminPage() {
       return
     }
 
-    // VERIFIER STOCK TECH
+    // STOCK TECH
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -273,7 +278,6 @@ export default function AdminPage() {
         .single()
 
     if (stockTech) {
-      // UPDATE
       await supabase
         .from("stock_tech")
         .update({
@@ -283,7 +287,6 @@ export default function AdminPage() {
         })
         .eq("id", stockTech.id)
     } else {
-      // INSERT
       await supabase
         .from("stock_tech")
         .insert({
@@ -295,7 +298,7 @@ export default function AdminPage() {
         })
     }
 
-    // RETIRER DU STOCK GENERAL
+    // RETIRER STOCK GENERAL
     await supabase
       .from("stock_general")
       .update({
