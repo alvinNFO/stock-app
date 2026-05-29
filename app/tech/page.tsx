@@ -4,225 +4,65 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 export default function TechnicienPage() {
-  const [stock, setStock] =
-    useState<any[]>([])
-
   const [user, setUser] =
     useState<any>(null)
 
-  const [search, setSearch] =
-    useState("")
+  const [stock, setStock] =
+    useState<any[]>([])
+
+  const [produits, setProduits] =
+    useState<any[]>([])
 
   const [selectedCategorie, setSelectedCategorie] =
     useState("")
 
-  const [utilisations, setUtilisations] =
-    useState<any[]>([])
+  const [search, setSearch] =
+    useState("")
 
-  // FETCH STOCK
-  const fetchStock =
-    async () => {
-      const {
-        data: sessionData,
-      } =
-        await supabase.auth.getUser()
+  // PRODUITS UTILISES
+  const [utilisation, setUtilisation] =
+    useState<any>({})
 
-      const currentUser =
-        sessionData?.user
+  // FETCH
+  const fetchData = async () => {
+    // USER CONNECTE
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-      if (!currentUser) {
-        return
-      }
+    if (!user) return
 
-      setUser(currentUser)
+    setUser(user)
 
-      const { data } =
-        await supabase
-          .from("stock_tech")
-          .select(`
+    // PRODUITS
+    const { data: produitsData } =
+      await supabase
+        .from("produits")
+        .select("*")
+
+    setProduits(produitsData || [])
+
+    // STOCK TECH
+    const { data: stockData } =
+      await supabase
+        .from("stock_tech")
+        .select(`
           *,
           produits (
+            id,
             nom,
             categorie,
             stock_minimum
           )
         `)
-          .eq(
-            "user_id",
-            currentUser.id
-          )
+        .eq("user_id", user.id)
 
-      setStock(data || [])
-    }
+    setStock(stockData || [])
+  }
 
   useEffect(() => {
-    fetchStock()
+    fetchData()
   }, [])
-
-  // AJOUTER UTILISATION
-  const ajouterUtilisation = (
-    item: any
-  ) => {
-    const existing =
-      utilisations.find(
-        (u) => u.id === item.id
-      )
-
-    if (existing) {
-      setUtilisations(
-        utilisations.map((u) =>
-          u.id === item.id
-            ? {
-                ...u,
-                quantite:
-                  u.quantite + 1,
-              }
-            : u
-        )
-      )
-    } else {
-      setUtilisations([
-        ...utilisations,
-        {
-          id: item.id,
-          produit_id:
-            item.produit_id,
-          nom:
-            item.produits?.nom,
-          quantite: 1,
-        },
-      ])
-    }
-  }
-
-  // RETIRER UTILISATION
-  const retirerUtilisation = (
-    item: any
-  ) => {
-    const existing =
-      utilisations.find(
-        (u) => u.id === item.id
-      )
-
-    if (!existing) return
-
-    if (existing.quantite <= 1) {
-      setUtilisations(
-        utilisations.filter(
-          (u) => u.id !== item.id
-        )
-      )
-    } else {
-      setUtilisations(
-        utilisations.map((u) =>
-          u.id === item.id
-            ? {
-                ...u,
-                quantite:
-                  u.quantite - 1,
-              }
-            : u
-        )
-      )
-    }
-  }
-
-  // CONFIRMER UTILISATIONS
-  const confirmerUtilisations =
-    async () => {
-      for (const item of utilisations) {
-        const stockItem =
-          stock.find(
-            (s) =>
-              s.id === item.id
-          )
-
-        if (!stockItem)
-          continue
-
-        const nouvelleQuantite =
-          stockItem.quantite -
-          item.quantite
-
-        if (
-          nouvelleQuantite < 0
-        ) {
-          continue
-        }
-
-        // UPDATE STOCK TECH
-        await supabase
-          .from("stock_tech")
-          .update({
-            quantite:
-              nouvelleQuantite,
-          })
-          .eq(
-            "id",
-            stockItem.id
-          )
-
-        // DEMANDE SI STOCK FAIBLE
-        if (
-          nouvelleQuantite <=
-          stockItem.produits
-            ?.stock_minimum
-        ) {
-          // VERIFIER SI EXISTE
-          const {
-            data:
-              existingDemande,
-          } =
-            await supabase
-              .from(
-                "demandes_stock"
-              )
-              .select("*")
-              .eq(
-                "user_id",
-                user.id
-              )
-              .eq(
-                "produit_id",
-                stockItem.produit_id
-              )
-              .eq(
-                "status",
-                "en_attente"
-              )
-              .single()
-
-          if (
-            !existingDemande
-          ) {
-            await supabase
-              .from(
-                "demandes_stock"
-              )
-              .insert({
-                user_id:
-                  user.id,
-                produit_id:
-                  stockItem.produit_id,
-                quantite:
-                  stockItem
-                    .produits
-                    ?.stock_minimum,
-                status:
-                  "en_attente",
-              })
-          }
-        }
-      }
-
-      alert(
-        "Utilisations enregistrées"
-      )
-
-      setUtilisations([])
-
-      fetchStock()
-    }
 
   // DECONNEXION
   const logout = async () => {
@@ -232,7 +72,118 @@ export default function TechnicienPage() {
       "/login"
   }
 
-  // CATEGORIES UNIQUES
+  // AJOUTER UTILISATION
+  const ajouterUtilisation = (
+    stockId: number
+  ) => {
+    setUtilisation({
+      ...utilisation,
+      [stockId]:
+        (utilisation[stockId] || 0) +
+        1,
+    })
+  }
+
+  // RETIRER UTILISATION
+  const retirerUtilisation = (
+    stockId: number
+  ) => {
+    if (
+      (utilisation[stockId] || 0) <= 0
+    )
+      return
+
+    setUtilisation({
+      ...utilisation,
+      [stockId]:
+        utilisation[stockId] - 1,
+    })
+  }
+
+  // CONFIRMER UTILISATION
+  const confirmerUtilisation =
+    async () => {
+      for (const item of stock) {
+        const quantiteUtilisee =
+          utilisation[item.id] || 0
+
+        if (
+          quantiteUtilisee <= 0
+        )
+          continue
+
+        const nouveauStock =
+          item.quantite -
+          quantiteUtilisee
+
+        // UPDATE STOCK TECH
+        await supabase
+          .from("stock_tech")
+          .update({
+            quantite:
+              nouveauStock,
+          })
+          .eq("id", item.id)
+
+        // SI STOCK MINIMUM
+        if (
+          nouveauStock <=
+          item.produits
+            ?.stock_minimum
+        ) {
+          // VERIFIER DEMANDE EXISTANTE
+          const {
+            data:
+              demandeExistante,
+          } = await supabase
+            .from(
+              "demandes_stock"
+            )
+            .select("*")
+            .eq(
+              "user_id",
+              user.id
+            )
+            .eq(
+              "produit_id",
+              item.produit_id
+            )
+            .eq(
+              "statut",
+              "en_attente"
+            )
+            .single()
+
+          // CREER DEMANDE
+          if (
+            !demandeExistante
+          ) {
+            await supabase
+              .from(
+                "demandes_stock"
+              )
+              .insert({
+                user_id:
+                  user.id,
+                produit_id:
+                  item.produit_id,
+                quantite_actuelle:
+                  nouveauStock,
+              })
+          }
+        }
+      }
+
+      alert(
+        "Stock mis à jour"
+      )
+
+      setUtilisation({})
+
+      fetchData()
+    }
+
+  // CATEGORIES
   const categories = [
     ...new Set(
       stock.map(
@@ -244,7 +195,7 @@ export default function TechnicienPage() {
   ]
 
   // FILTRE
-  const filteredStock =
+  const stockFiltre =
     stock.filter(
       (item: any) => {
         const matchSearch =
@@ -268,28 +219,61 @@ export default function TechnicienPage() {
       }
     )
 
+  // GROUPER
+  const stockGroupe =
+    stockFiltre.reduce(
+      (
+        acc: any,
+        item: any
+      ) => {
+        const cat =
+          item.produits
+            ?.categorie ||
+          "Sans catégorie"
+
+        if (!acc[cat]) {
+          acc[cat] = []
+        }
+
+        acc[cat].push(item)
+
+        return acc
+      },
+      {}
+    )
+
   return (
     <div
       style={{
         padding: 20,
       }}
     >
-      <h1>
-        Stock technicien
-      </h1>
-
-      <button
-        onClick={logout}
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems:
+            "center",
+        }}
       >
-        Déconnexion
-      </button>
+        <h1>
+          Stock Technicien
+        </h1>
+
+        <button
+          onClick={logout}
+        >
+          Déconnexion
+        </button>
+      </div>
 
       <hr />
 
       {/* RECHERCHE */}
 
       <input
-        placeholder="Rechercher produit..."
+        placeholder="Recherche produit..."
         value={search}
         onChange={(e) =>
           setSearch(
@@ -304,6 +288,8 @@ export default function TechnicienPage() {
 
       <br />
       <br />
+
+      {/* CATEGORIES */}
 
       <select
         value={
@@ -338,113 +324,93 @@ export default function TechnicienPage() {
 
       {/* STOCK */}
 
-      {filteredStock.map(
-        (item: any) => (
-          <div
-            key={item.id}
-            style={{
-              border:
-                "1px solid #ccc",
-              padding: 10,
-              marginBottom: 10,
-            }}
-          >
-            <h2>
-              {
-                item.produits
-                  ?.nom
-              }
+      {Object.entries(
+        stockGroupe
+      ).map(
+        ([cat, items]: any) => (
+          <div key={cat}>
+            <h2
+              style={{
+                color: "blue",
+              }}
+            >
+              {cat}
             </h2>
 
-            <p>
-              Catégorie :
-              {" "}
-              {
-                item.produits
-                  ?.categorie
-              }
-            </p>
+            {items.map(
+              (item: any) => (
+                <div
+                  key={item.id}
+                  style={{
+                    border:
+                      "1px solid #ccc",
+                    padding: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <h3>
+                    {
+                      item
+                        .produits
+                        ?.nom
+                    }
+                  </h3>
 
-            <p>
-              Quantité :
-              {" "}
-              {
-                item.quantite
-              }
-            </p>
+                  <p>
+                    Stock :
+                    {" "}
+                    {
+                      item.quantite
+                    }
+                  </p>
 
-            <button
-              onClick={() =>
-                ajouterUtilisation(
-                  item
-                )
-              }
-            >
-              +
-            </button>
+                  <p>
+                    Utilisé :
+                    {" "}
+                    {utilisation[
+                      item.id
+                    ] || 0}
+                  </p>
 
-            <button
-              onClick={() =>
-                retirerUtilisation(
-                  item
-                )
-              }
-            >
-              -
-            </button>
+                  <button
+                    onClick={() =>
+                      ajouterUtilisation(
+                        item.id
+                      )
+                    }
+                  >
+                    +1 utilisé
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      retirerUtilisation(
+                        item.id
+                      )
+                    }
+                  >
+                    -1
+                  </button>
+                </div>
+              )
+            )}
           </div>
         )
       )}
 
       <hr />
 
-      {/* UTILISATIONS */}
-
-      <h2>
-        Produits utilisés
-      </h2>
-
-      {utilisations.map(
-        (
-          item: any,
-          index
-        ) => (
-          <div
-            key={index}
-            style={{
-              border:
-                "1px solid orange",
-              padding: 10,
-              marginBottom: 10,
-            }}
-          >
-            <h3>{item.nom}</h3>
-
-            <p>
-              Quantité utilisée :
-              {" "}
-              {
-                item.quantite
-              }
-            </p>
-          </div>
-        )
-      )}
-
-      {utilisations.length >
-        0 && (
-        <button
-          onClick={
-            confirmerUtilisations
-          }
-          style={{
-            padding:
-              "10px 20px",
-          }}
-        >
-          Confirmer les utilisations
-        </button>
-      )}
+      <button
+        onClick={
+          confirmerUtilisation
+        }
+        style={{
+          padding: 15,
+          fontSize: 18,
+        }}
+      >
+        Confirmer utilisation
+      </button>
     </div>
   )
 }

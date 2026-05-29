@@ -14,13 +14,15 @@ export default function AdminPage() {
   const [users, setUsers] =
     useState<any[]>([])
 
-  const [stockTechnicien, setStockTechnicien] =
+  const [demandes, setDemandes] =
     useState<any[]>([])
 
-  const [selectedTechStock, setSelectedTechStock] =
+  const [quantitesDemandes, setQuantitesDemandes] =
+    useState<any>({})
+
+  const [nom, setNom] =
     useState("")
 
-  const [nom, setNom] = useState("")
   const [reference, setReference] =
     useState("")
 
@@ -39,29 +41,16 @@ export default function AdminPage() {
   const [quantite, setQuantite] =
     useState(1)
 
-  // RECHERCHE STOCK
   const [search, setSearch] =
     useState("")
 
-  const [
-    selectedCategorie,
-    setSelectedCategorie,
-  ] = useState("")
+  const [selectedCategorie, setSelectedCategorie] =
+    useState("")
 
-  // REDUIRE STOCK
   const [showStock, setShowStock] =
     useState(true)
 
-  // RECHERCHE ATTRIBUTION
-  const [searchProduit, setSearchProduit] =
-    useState("")
-
-  const [
-    categorieProduit,
-    setCategorieProduit,
-  ] = useState("")
-
-  // FETCH DATA
+  // FETCH
   const fetchData = async () => {
     // PRODUITS
     const { data: produitsData } =
@@ -83,8 +72,11 @@ export default function AdminPage() {
           produits (
             id,
             nom,
+            reference,
             categorie,
-            stock_minimum
+            stock_minimum,
+            fournisseur,
+            lien_fournisseur
           )
         `)
 
@@ -98,6 +90,23 @@ export default function AdminPage() {
         .order("email")
 
     setUsers(usersData || [])
+
+    // DEMANDES
+    const { data: demandesData } =
+      await supabase
+        .from("demandes_stock")
+        .select(`
+          *,
+          produits (
+            nom
+          ),
+          techniciens (
+            email
+          )
+        `)
+        .eq("statut", "en_attente")
+
+    setDemandes(demandesData || [])
   }
 
   useEffect(() => {
@@ -105,96 +114,153 @@ export default function AdminPage() {
   }, [])
 
   // AJOUT PRODUIT
-  const ajouterProduit = async () => {
-    if (!nom || !reference) {
-      alert("Champs manquants")
-      return
-    }
+  const ajouterProduit =
+    async () => {
+      if (
+        !nom ||
+        !reference
+      ) {
+        alert(
+          "Remplir les champs"
+        )
+        return
+      }
 
-    const { data } =
+      const { data, error } =
+        await supabase
+          .from("produits")
+          .insert({
+            nom,
+            reference,
+            categorie,
+            stock_minimum:
+              stockMinimum,
+          })
+          .select()
+          .single()
+
+      if (error) {
+        alert(error.message)
+        return
+      }
+
+      // CREER STOCK GENERAL
       await supabase
-        .from("produits")
+        .from(
+          "stock_general"
+        )
         .insert({
-          nom,
-          reference,
-          categorie,
-          stock_minimum:
-            stockMinimum,
+          produit_id: data.id,
+          quantite: 0,
         })
-        .select()
-        .single()
 
-    await supabase
-      .from("stock_general")
-      .insert({
-        produit_id: data.id,
-        quantite: 0,
-      })
-
-    setNom("")
-    setReference("")
-    setCategorie("")
-    setStockMinimum(10)
-
-    fetchData()
-  }
-
-  // MODIFIER STOCK
-  const modifierStock = async (
-    item: any,
-    valeur: number
-  ) => {
-    const nouvelleQuantite =
-      item.quantite + valeur
-
-    if (nouvelleQuantite < 0) {
-      return
-    }
-
-    await supabase
-      .from("stock_general")
-      .update({
-        quantite: nouvelleQuantite,
-      })
-      .eq("id", item.id)
-
-    fetchData()
-  }
-
-  // ATTRIBUER MATERIEL
-  const attribuerMateriel = async () => {
-    if (
-      !selectedUser ||
-      !selectedProduit ||
-      quantite <= 0
-    ) {
-      alert("Champs invalides")
-      return
-    }
-
-    const stockGeneralItem =
-      stockGeneral.find(
-        (s) =>
-          s.produit_id ==
-          selectedProduit
+      alert(
+        "Produit ajouté"
       )
 
-    if (!stockGeneralItem) {
-      alert("Produit absent")
-      return
+      setNom("")
+      setReference("")
+      setCategorie("")
+      setStockMinimum(10)
+
+      fetchData()
     }
 
-    if (
-      stockGeneralItem.quantite <
-      quantite
-    ) {
-      alert("Stock insuffisant")
-      return
-    }
+  // MODIFIER STOCK
+  const modifierStock =
+    async (
+      item: any,
+      valeur: number
+    ) => {
+      const nouvelleQuantite =
+        item.quantite +
+        valeur
 
-    // STOCK TECH EXISTANT
-    const { data: stockTech } =
+      if (
+        nouvelleQuantite < 0
+      ) {
+        alert("Impossible")
+        return
+      }
+
       await supabase
+        .from(
+          "stock_general"
+        )
+        .update({
+          quantite:
+            nouvelleQuantite,
+        })
+        .eq("id", item.id)
+
+      fetchData()
+    }
+
+  // MODIFIER CATEGORIE
+  const modifierCategorie =
+    async (
+      produitId: number,
+      nouvelleCategorie: string
+    ) => {
+      await supabase
+        .from("produits")
+        .update({
+          categorie:
+            nouvelleCategorie,
+        })
+        .eq("id", produitId)
+
+      fetchData()
+    }
+
+  // ATTRIBUER MATERIEL
+  const attribuerMateriel =
+    async () => {
+      if (
+        !selectedUser ||
+        !selectedProduit ||
+        quantite <= 0
+      ) {
+        alert(
+          "Champs invalides"
+        )
+        return
+      }
+
+      const stockGeneralItem =
+        stockGeneral.find(
+          (s: any) =>
+            String(
+              s.produit_id
+            ) ===
+            String(
+              selectedProduit
+            )
+        )
+
+      if (
+        !stockGeneralItem
+      ) {
+        alert(
+          "Produit absent"
+        )
+        return
+      }
+
+      if (
+        stockGeneralItem.quantite <
+        quantite
+      ) {
+        alert(
+          "Stock insuffisant"
+        )
+        return
+      }
+
+      // STOCK TECH
+      const {
+        data: stockTech,
+      } = await supabase
         .from("stock_tech")
         .select("*")
         .eq(
@@ -207,78 +273,174 @@ export default function AdminPage() {
         )
         .single()
 
-    if (stockTech) {
+      if (stockTech) {
+        await supabase
+          .from(
+            "stock_tech"
+          )
+          .update({
+            quantite:
+              stockTech.quantite +
+              quantite,
+          })
+          .eq(
+            "id",
+            stockTech.id
+          )
+      } else {
+        await supabase
+          .from(
+            "stock_tech"
+          )
+          .insert({
+            user_id:
+              selectedUser,
+            produit_id:
+              selectedProduit,
+            quantite,
+          })
+      }
+
+      // RETIRER STOCK GENERAL
       await supabase
-        .from("stock_tech")
+        .from(
+          "stock_general"
+        )
         .update({
           quantite:
-            stockTech.quantite +
+            stockGeneralItem.quantite -
             quantite,
         })
-        .eq("id", stockTech.id)
-    } else {
-      await supabase
+        .eq(
+          "id",
+          stockGeneralItem.id
+        )
+
+      alert(
+        "Matériel attribué"
+      )
+
+      fetchData()
+    }
+
+  // ACCEPTER DEMANDE
+  const accepterDemande =
+    async (
+      demande: any
+    ) => {
+      const quantiteAjout =
+        Number(
+          quantitesDemandes[
+            demande.id
+          ]
+        ) || 0
+
+      if (
+        quantiteAjout <= 0
+      ) {
+        alert(
+          "Quantité invalide"
+        )
+        return
+      }
+
+      // STOCK TECH
+      const {
+        data: stockTech,
+      } = await supabase
         .from("stock_tech")
-        .insert({
-          user_id: selectedUser,
-          produit_id:
-            selectedProduit,
-          quantite,
-        })
-    }
+        .select("*")
+        .eq(
+          "user_id",
+          demande.user_id
+        )
+        .eq(
+          "produit_id",
+          demande.produit_id
+        )
+        .single()
 
-    // RETIRER STOCK GENERAL
-    await supabase
-      .from("stock_general")
-      .update({
-        quantite:
-          stockGeneralItem.quantite -
-          quantite,
-      })
-      .eq("id", stockGeneralItem.id)
-
-    alert("Matériel attribué")
-
-    fetchData()
-  }
-
-  // VOIR STOCK TECHNICIEN
-  const voirStockTechnicien =
-    async (userId: string) => {
-      setSelectedTechStock(
-        userId
-      )
-
-      const { data } =
+      if (stockTech) {
         await supabase
-          .from("stock_tech")
-          .select(`
-            *,
-            produits (
-              nom,
-              categorie
-            )
-          `)
-          .eq("user_id", userId)
+          .from(
+            "stock_tech"
+          )
+          .update({
+            quantite:
+              stockTech.quantite +
+              quantiteAjout,
+          })
+          .eq(
+            "id",
+            stockTech.id
+          )
+      } else {
+        await supabase
+          .from(
+            "stock_tech"
+          )
+          .insert({
+            user_id:
+              demande.user_id,
+            produit_id:
+              demande.produit_id,
+            quantite:
+              quantiteAjout,
+          })
+      }
 
-      setStockTechnicien(
-        data || []
+      // STOCK GENERAL
+      const stockItem =
+        stockGeneral.find(
+          (s: any) =>
+            s.produit_id ===
+            demande.produit_id
+        )
+
+      await supabase
+        .from(
+          "stock_general"
+        )
+        .update({
+          quantite:
+            stockItem.quantite -
+            quantiteAjout,
+        })
+        .eq(
+          "id",
+          stockItem.id
+        )
+
+      // SUPPRIMER DEMANDE
+      await supabase
+        .from(
+          "demandes_stock"
+        )
+        .delete()
+        .eq(
+          "id",
+          demande.id
+        )
+
+      alert(
+        "Demande acceptée"
       )
+
+      fetchData()
     }
 
-  // CATEGORIES STOCK
+  // CATEGORIES
   const categories = [
     ...new Set(
-      stockGeneral.map(
-        (item: any) =>
-          item.produits
-            ?.categorie
+      produits.map(
+        (p: any) =>
+          p.categorie
       )
     ),
   ]
 
-  // FILTRE STOCK
-  const filteredStock =
+  // FILTRE
+  const stockFiltre =
     stockGeneral.filter(
       (item: any) => {
         const matchSearch =
@@ -302,9 +464,9 @@ export default function AdminPage() {
       }
     )
 
-  // GROUPER STOCK
-  const groupedStock =
-    filteredStock.reduce(
+  // GROUPER
+  const stockGroupe =
+    stockFiltre.reduce(
       (
         acc: any,
         item: any
@@ -325,42 +487,12 @@ export default function AdminPage() {
       {}
     )
 
-  // CATEGORIES ATTRIBUTION
-  const categoriesProduits = [
-    ...new Set(
-      produits.map(
-        (p: any) =>
-          p.categorie
-      )
-    ),
-  ]
-
-  // PRODUITS FILTRES
-  const produitsFiltres =
-    produits.filter(
-      (produit: any) => {
-        const matchSearch =
-          produit.nom
-            ?.toLowerCase()
-            .includes(
-              searchProduit.toLowerCase()
-            )
-
-        const matchCategorie =
-          categorieProduit ===
-            "" ||
-          produit.categorie ===
-            categorieProduit
-
-        return (
-          matchSearch &&
-          matchCategorie
-        )
-      }
-    )
-
   return (
-    <div style={{ padding: 20 }}>
+    <div
+      style={{
+        padding: 20,
+      }}
+    >
       <h1>ADMIN</h1>
 
       <hr />
@@ -412,7 +544,10 @@ export default function AdminPage() {
 
       <input
         type="number"
-        value={stockMinimum}
+        placeholder="Stock minimum"
+        value={
+          stockMinimum
+        }
         onChange={(e) =>
           setStockMinimum(
             Number(
@@ -435,17 +570,97 @@ export default function AdminPage() {
 
       <hr />
 
+      {/* DEMANDES */}
+
+      <h2>
+        Demandes en attente
+      </h2>
+
+      {demandes.map(
+        (demande: any) => (
+          <div
+            key={demande.id}
+            style={{
+              border:
+                "1px solid orange",
+              padding: 10,
+              marginBottom: 10,
+            }}
+          >
+            <p>
+              Technicien :
+              {" "}
+              {
+                demande
+                  .techniciens
+                  ?.email
+              }
+            </p>
+
+            <p>
+              Produit :
+              {" "}
+              {
+                demande
+                  .produits
+                  ?.nom
+              }
+            </p>
+
+            <p>
+              Stock actuel :
+              {" "}
+              {
+                demande.quantite_actuelle
+              }
+            </p>
+
+            <input
+              type="number"
+              placeholder="Quantité à donner"
+              onChange={(e) =>
+                setQuantitesDemandes(
+                  {
+                    ...quantitesDemandes,
+                    [demande.id]:
+                      e.target
+                        .value,
+                  }
+                )
+              }
+            />
+
+            <br />
+            <br />
+
+            <button
+              onClick={() =>
+                accepterDemande(
+                  demande
+                )
+              }
+            >
+              Accepter
+            </button>
+          </div>
+        )
+      )}
+
+      <hr />
+
       {/* GESTION STOCK */}
 
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 10,
+          justifyContent:
+            "space-between",
+          alignItems:
+            "center",
         }}
       >
         <h2>
-          Gestion des stocks
+          Gestion Stock
         </h2>
 
         <button
@@ -457,18 +672,21 @@ export default function AdminPage() {
         >
           {showStock
             ? "Réduire"
-            : "Agrandir"}
+            : "Afficher"}
         </button>
       </div>
 
       {showStock && (
         <>
+          {/* RECHERCHE */}
+
           <input
             placeholder="Recherche produit..."
             value={search}
             onChange={(e) =>
               setSearch(
-                e.target.value
+                e.target
+                  .value
               )
             }
             style={{
@@ -480,13 +698,16 @@ export default function AdminPage() {
           <br />
           <br />
 
+          {/* FILTRE CATEGORIE */}
+
           <select
             value={
               selectedCategorie
             }
             onChange={(e) =>
               setSelectedCategorie(
-                e.target.value
+                e.target
+                  .value
               )
             }
           >
@@ -511,33 +732,37 @@ export default function AdminPage() {
 
           <hr />
 
+          {/* STOCK */}
+
           {Object.entries(
-            groupedStock
+            stockGroupe
           ).map(
             (
               [cat, items]: any
             ) => (
               <div
                 key={cat}
-                style={{
-                  marginBottom: 30,
-                }}
               >
                 <h2
                   style={{
-                    color: "blue",
+                    color:
+                      "blue",
                   }}
                 >
                   {cat}
                 </h2>
 
                 {items.map(
-                  (item: any) => (
+                  (
+                    item: any
+                  ) => (
                     <div
-                      key={item.id}
+                      key={
+                        item.id
+                      }
                       style={{
                         border:
-                          "1px solid #ccc",
+                          "1px solid blue",
                         padding: 10,
                         marginBottom: 10,
                       }}
@@ -557,6 +782,30 @@ export default function AdminPage() {
                           item.quantite
                         }
                       </p>
+
+                      <input
+                        value={
+                          item
+                            .produits
+                            ?.categorie ||
+                          ""
+                        }
+                        onChange={(
+                          e
+                        ) =>
+                          modifierCategorie(
+                            item
+                              .produits
+                              .id,
+                            e
+                              .target
+                              .value
+                          )
+                        }
+                      />
+
+                      <br />
+                      <br />
 
                       <button
                         onClick={() =>
@@ -615,11 +864,13 @@ export default function AdminPage() {
       {/* ATTRIBUER */}
 
       <h2>
-        Attribuer matériel
+        Attribuer Matériel
       </h2>
 
       <select
-        value={selectedUser}
+        value={
+          selectedUser
+        }
         onChange={(e) =>
           setSelectedUser(
             e.target.value
@@ -645,55 +896,6 @@ export default function AdminPage() {
       <br />
       <br />
 
-      <input
-        placeholder="Rechercher produit..."
-        value={searchProduit}
-        onChange={(e) =>
-          setSearchProduit(
-            e.target.value
-          )
-        }
-        style={{
-          padding: 10,
-          width: 300,
-        }}
-      />
-
-      <br />
-      <br />
-
-      <select
-        value={
-          categorieProduit
-        }
-        onChange={(e) =>
-          setCategorieProduit(
-            e.target.value
-          )
-        }
-      >
-        <option value="">
-          Toutes catégories
-        </option>
-
-        {categoriesProduits.map(
-          (
-            cat: any,
-            index
-          ) => (
-            <option
-              key={index}
-              value={cat}
-            >
-              {cat}
-            </option>
-          )
-        )}
-      </select>
-
-      <br />
-      <br />
-
       <select
         value={
           selectedProduit
@@ -708,12 +910,14 @@ export default function AdminPage() {
           Choisir produit
         </option>
 
-        {produitsFiltres.map(
+        {produits.map(
           (
             produit: any
           ) => (
             <option
-              key={produit.id}
+              key={
+                produit.id
+              }
               value={
                 produit.id
               }
@@ -749,81 +953,6 @@ export default function AdminPage() {
       >
         Attribuer
       </button>
-
-      <hr />
-
-      {/* STOCK TECH */}
-
-      <h2>
-        Stock technicien
-      </h2>
-
-      <select
-        value={
-          selectedTechStock
-        }
-        onChange={(e) =>
-          voirStockTechnicien(
-            e.target.value
-          )
-        }
-      >
-        <option value="">
-          Choisir technicien
-        </option>
-
-        {users.map(
-          (user: any) => (
-            <option
-              key={user.id}
-              value={user.id}
-            >
-              {user.email}
-            </option>
-          )
-        )}
-      </select>
-
-      <br />
-      <br />
-
-      {stockTechnicien.map(
-        (item: any) => (
-          <div
-            key={item.id}
-            style={{
-              border:
-                "1px solid green",
-              padding: 10,
-              marginBottom: 10,
-            }}
-          >
-            <h3>
-              {
-                item.produits
-                  ?.nom
-              }
-            </h3>
-
-            <p>
-              Catégorie :
-              {" "}
-              {
-                item.produits
-                  ?.categorie
-              }
-            </p>
-
-            <p>
-              Quantité :
-              {" "}
-              {
-                item.quantite
-              }
-            </p>
-          </div>
-        )
-      )}
     </div>
   )
 }
