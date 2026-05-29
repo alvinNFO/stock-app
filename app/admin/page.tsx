@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 export default function AdminPage() {
+  // STATES
   const [produits, setProduits] =
     useState<any[]>([])
 
@@ -38,19 +39,30 @@ export default function AdminPage() {
   const [quantite, setQuantite] =
     useState(1)
 
+  // RECHERCHE STOCK
   const [search, setSearch] =
     useState("")
 
   const [selectedCategorie, setSelectedCategorie] =
     useState("")
 
-  // FETCH
+  // RECHERCHE ATTRIBUTION
+  const [searchProduit, setSearchProduit] =
+    useState("")
+
+  const [
+    categorieProduit,
+    setCategorieProduit,
+  ] = useState("")
+
+  // FETCH DATA
   const fetchData = async () => {
     // PRODUITS
     const { data: produitsData } =
       await supabase
         .from("produits")
         .select("*")
+        .order("nom")
 
     setProduits(produitsData || [])
 
@@ -72,11 +84,12 @@ export default function AdminPage() {
 
     setStockGeneral(stockData || [])
 
-    // USERS
+    // TECHNICIENS
     const { data: usersData } =
       await supabase
         .from("techniciens")
         .select("*")
+        .order("email")
 
     setUsers(usersData || [])
   }
@@ -88,6 +101,7 @@ export default function AdminPage() {
   // AJOUT PRODUIT
   const ajouterProduit = async () => {
     if (!nom || !reference) {
+      alert("Champs manquants")
       return
     }
 
@@ -155,7 +169,7 @@ export default function AdminPage() {
     const stockGeneralItem =
       stockGeneral.find(
         (s) =>
-          s.produit_id ===
+          s.produit_id ==
           selectedProduit
       )
 
@@ -172,7 +186,7 @@ export default function AdminPage() {
       return
     }
 
-    // STOCK TECH
+    // VERIFIER STOCK TECH
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -222,7 +236,7 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // VOIR STOCK TECH
+  // VOIR STOCK TECHNICIEN
   const voirStockTechnicien =
     async (userId: string) => {
       setSelectedTechStock(
@@ -246,7 +260,7 @@ export default function AdminPage() {
       )
     }
 
-  // CATEGORIES UNIQUES
+  // CATEGORIES STOCK
   const categories = [
     ...new Set(
       stockGeneral.map(
@@ -257,7 +271,7 @@ export default function AdminPage() {
     ),
   ]
 
-  // FILTRE
+  // FILTRE STOCK
   const filteredStock =
     stockGeneral.filter(
       (item: any) => {
@@ -282,7 +296,7 @@ export default function AdminPage() {
       }
     )
 
-  // GROUPED
+  // GROUPER STOCK
   const groupedStock =
     filteredStock.reduce(
       (
@@ -303,6 +317,40 @@ export default function AdminPage() {
         return acc
       },
       {}
+    )
+
+  // CATEGORIES ATTRIBUTION
+  const categoriesProduits = [
+    ...new Set(
+      produits.map(
+        (p: any) =>
+          p.categorie
+      )
+    ),
+  ]
+
+  // PRODUITS FILTRES
+  const produitsFiltres =
+    produits.filter(
+      (produit: any) => {
+        const matchSearch =
+          produit.nom
+            ?.toLowerCase()
+            .includes(
+              searchProduit.toLowerCase()
+            )
+
+        const matchCategorie =
+          categorieProduit ===
+            "" ||
+          produit.categorie ===
+            categorieProduit
+
+        return (
+          matchSearch &&
+          matchCategorie
+        )
+      }
     )
 
   return (
@@ -376,7 +424,7 @@ export default function AdminPage() {
           ajouterProduit
         }
       >
-        Ajouter
+        Ajouter Produit
       </button>
 
       <hr />
@@ -388,7 +436,7 @@ export default function AdminPage() {
       </h2>
 
       <input
-        placeholder="Rechercher produit..."
+        placeholder="Recherche produit..."
         value={search}
         onChange={(e) =>
           setSearch(
@@ -396,8 +444,8 @@ export default function AdminPage() {
           )
         }
         style={{
-          padding: "10px",
-          width: "300px",
+          padding: 10,
+          width: 300,
         }}
       />
 
@@ -434,8 +482,6 @@ export default function AdminPage() {
       </select>
 
       <hr />
-
-      {/* STOCKS */}
 
       {Object.entries(
         groupedStock
@@ -567,6 +613,55 @@ export default function AdminPage() {
       <br />
       <br />
 
+      <input
+        placeholder="Rechercher produit..."
+        value={searchProduit}
+        onChange={(e) =>
+          setSearchProduit(
+            e.target.value
+          )
+        }
+        style={{
+          padding: 10,
+          width: 300,
+        }}
+      />
+
+      <br />
+      <br />
+
+      <select
+        value={
+          categorieProduit
+        }
+        onChange={(e) =>
+          setCategorieProduit(
+            e.target.value
+          )
+        }
+      >
+        <option value="">
+          Toutes catégories
+        </option>
+
+        {categoriesProduits.map(
+          (
+            cat: any,
+            index
+          ) => (
+            <option
+              key={index}
+              value={cat}
+            >
+              {cat}
+            </option>
+          )
+        )}
+      </select>
+
+      <br />
+      <br />
+
       <select
         value={
           selectedProduit
@@ -581,7 +676,7 @@ export default function AdminPage() {
           Choisir produit
         </option>
 
-        {produits.map(
+        {produitsFiltres.map(
           (
             produit: any
           ) => (
