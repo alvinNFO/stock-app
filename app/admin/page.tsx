@@ -43,8 +43,14 @@ export default function AdminPage() {
   const [search, setSearch] =
     useState("")
 
-  const [selectedCategorie, setSelectedCategorie] =
-    useState("")
+  const [
+    selectedCategorie,
+    setSelectedCategorie,
+  ] = useState("")
+
+  // REDUIRE STOCK
+  const [showStock, setShowStock] =
+    useState(true)
 
   // RECHERCHE ATTRIBUTION
   const [searchProduit, setSearchProduit] =
@@ -186,7 +192,7 @@ export default function AdminPage() {
       return
     }
 
-    // VERIFIER STOCK TECH
+    // STOCK TECH EXISTANT
     const { data: stockTech } =
       await supabase
         .from("stock_tech")
@@ -247,12 +253,12 @@ export default function AdminPage() {
         await supabase
           .from("stock_tech")
           .select(`
-          *,
-          produits (
-            nom,
-            categorie
-          )
-        `)
+            *,
+            produits (
+              nom,
+              categorie
+            )
+          `)
           .eq("user_id", userId)
 
       setStockTechnicien(
@@ -431,151 +437,177 @@ export default function AdminPage() {
 
       {/* GESTION STOCK */}
 
-      <h2>
-        Gestion des stocks
-      </h2>
-
-      <input
-        placeholder="Recherche produit..."
-        value={search}
-        onChange={(e) =>
-          setSearch(
-            e.target.value
-          )
-        }
+      <div
         style={{
-          padding: 10,
-          width: 300,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}
-      />
-
-      <br />
-      <br />
-
-      <select
-        value={
-          selectedCategorie
-        }
-        onChange={(e) =>
-          setSelectedCategorie(
-            e.target.value
-          )
-        }
       >
-        <option value="">
-          Toutes catégories
-        </option>
+        <h2>
+          Gestion des stocks
+        </h2>
 
-        {categories.map(
-          (
-            cat: any,
-            index
-          ) => (
-            <option
-              key={index}
-              value={cat}
-            >
-              {cat}
-            </option>
-          )
-        )}
-      </select>
+        <button
+          onClick={() =>
+            setShowStock(
+              !showStock
+            )
+          }
+        >
+          {showStock
+            ? "Réduire"
+            : "Agrandir"}
+        </button>
+      </div>
 
-      <hr />
-
-      {Object.entries(
-        groupedStock
-      ).map(
-        ([cat, items]: any) => (
-          <div
-            key={cat}
+      {showStock && (
+        <>
+          <input
+            placeholder="Recherche produit..."
+            value={search}
+            onChange={(e) =>
+              setSearch(
+                e.target.value
+              )
+            }
             style={{
-              marginBottom: 30,
+              padding: 10,
+              width: 300,
             }}
+          />
+
+          <br />
+          <br />
+
+          <select
+            value={
+              selectedCategorie
+            }
+            onChange={(e) =>
+              setSelectedCategorie(
+                e.target.value
+              )
+            }
           >
-            <h2
-              style={{
-                color: "blue",
-              }}
-            >
-              {cat}
-            </h2>
+            <option value="">
+              Toutes catégories
+            </option>
 
-            {items.map(
-              (item: any) => (
-                <div
-                  key={item.id}
-                  style={{
-                    border:
-                      "1px solid #ccc",
-                    padding: 10,
-                    marginBottom: 10,
-                  }}
+            {categories.map(
+              (
+                cat: any,
+                index
+              ) => (
+                <option
+                  key={index}
+                  value={cat}
                 >
-                  <h3>
-                    {
-                      item
-                        .produits
-                        ?.nom
-                    }
-                  </h3>
-
-                  <p>
-                    Stock :
-                    {" "}
-                    {
-                      item.quantite
-                    }
-                  </p>
-
-                  <button
-                    onClick={() =>
-                      modifierStock(
-                        item,
-                        1
-                      )
-                    }
-                  >
-                    +1
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      modifierStock(
-                        item,
-                        10
-                      )
-                    }
-                  >
-                    +10
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      modifierStock(
-                        item,
-                        -1
-                      )
-                    }
-                  >
-                    -1
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      modifierStock(
-                        item,
-                        -10
-                      )
-                    }
-                  >
-                    -10
-                  </button>
-                </div>
+                  {cat}
+                </option>
               )
             )}
-          </div>
-        )
+          </select>
+
+          <hr />
+
+          {Object.entries(
+            groupedStock
+          ).map(
+            (
+              [cat, items]: any
+            ) => (
+              <div
+                key={cat}
+                style={{
+                  marginBottom: 30,
+                }}
+              >
+                <h2
+                  style={{
+                    color: "blue",
+                  }}
+                >
+                  {cat}
+                </h2>
+
+                {items.map(
+                  (item: any) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        border:
+                          "1px solid #ccc",
+                        padding: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <h3>
+                        {
+                          item
+                            .produits
+                            ?.nom
+                        }
+                      </h3>
+
+                      <p>
+                        Stock :
+                        {" "}
+                        {
+                          item.quantite
+                        }
+                      </p>
+
+                      <button
+                        onClick={() =>
+                          modifierStock(
+                            item,
+                            1
+                          )
+                        }
+                      >
+                        +1
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          modifierStock(
+                            item,
+                            10
+                          )
+                        }
+                      >
+                        +10
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          modifierStock(
+                            item,
+                            -1
+                          )
+                        }
+                      >
+                        -1
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          modifierStock(
+                            item,
+                            -10
+                          )
+                        }
+                      >
+                        -10
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            )
+          )}
+        </>
       )}
 
       <hr />
