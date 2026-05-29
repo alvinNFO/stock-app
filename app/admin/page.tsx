@@ -4,11 +4,14 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 export default function AdminPage() {
-  const [produits, setProduits] = useState<any[]>([])
+  const [produits, setProduits] =
+    useState<any[]>([])
+
   const [stockGeneral, setStockGeneral] =
     useState<any[]>([])
 
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] =
+    useState<any[]>([])
 
   const [demandes, setDemandes] =
     useState<any[]>([])
@@ -18,9 +21,6 @@ export default function AdminPage() {
 
   const [selectedTechStock, setSelectedTechStock] =
     useState("")
-
-  const [showStocks, setShowStocks] =
-    useState(true)
 
   const [nom, setNom] = useState("")
   const [reference, setReference] =
@@ -38,10 +38,17 @@ export default function AdminPage() {
   const [selectedProduit, setSelectedProduit] =
     useState("")
 
-  const [quantite, setQuantite] = useState(1)
+  const [quantite, setQuantite] =
+    useState(1)
 
   const [quantitesDemandes, setQuantitesDemandes] =
     useState<any>({})
+
+  const [search, setSearch] =
+    useState("")
+
+  const [searchCategorie, setSearchCategorie] =
+    useState("")
 
   // FETCH DATA
   const fetchData = async () => {
@@ -91,14 +98,17 @@ export default function AdminPage() {
           )
         `)
 
-    const demandesEnAttente =
+    setDemandes(
       (demandesData || []).filter(
         (d: any) =>
           d.status !== "validee"
       )
-
-    setDemandes(demandesEnAttente)
+    )
   }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
 
   // VOIR STOCK TECHNICIEN
   const voirStockTechnicien = async (
@@ -106,59 +116,19 @@ export default function AdminPage() {
   ) => {
     setSelectedTechStock(userId)
 
-    const { data } = await supabase
-      .from("stock_tech")
-      .select(`
-        *,
-        produits (
-          nom,
-          categorie
-        )
-      `)
-      .eq("user_id", userId)
+    const { data } =
+      await supabase
+        .from("stock_tech")
+        .select(`
+          *,
+          produits (
+            nom,
+            categorie
+          )
+        `)
+        .eq("user_id", userId)
 
     setStockTechnicien(data || [])
-  }
-
-  // AJOUT PRODUIT
-  const ajouterProduit = async () => {
-    if (!nom || !reference) {
-      alert("Remplir les champs")
-      return
-    }
-
-    const { data, error } =
-      await supabase
-        .from("produits")
-        .insert({
-          nom,
-          reference,
-          categorie,
-          stock_minimum: stockMinimum,
-        })
-        .select()
-        .single()
-
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    await supabase
-      .from("stock_general")
-      .insert({
-        produit_id: data.id,
-        quantite: 0,
-      })
-
-    alert("Produit ajouté")
-
-    setNom("")
-    setReference("")
-    setCategorie("")
-    setStockMinimum(10)
-
-    fetchData()
   }
 
   // MODIFIER STOCK
@@ -170,7 +140,6 @@ export default function AdminPage() {
       item.quantite + valeur
 
     if (nouvelleQuantite < 0) {
-      alert("Impossible")
       return
     }
 
@@ -184,396 +153,321 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // ATTRIBUER MATERIEL
-  const attribuerMateriel = async () => {
-    if (
-      !selectedUser ||
-      !selectedProduit ||
-      quantite <= 0
-    ) {
-      alert("Champs invalides")
+  // AJOUT PRODUIT
+  const ajouterProduit = async () => {
+    if (!nom || !reference) {
       return
     }
 
-    const stockGeneralItem =
-      stockGeneral.find(
-        (s) =>
-          s.produit_id === selectedProduit
-      )
-
-    if (!stockGeneralItem) {
-      alert("Produit absent")
-      return
-    }
-
-    if (
-      stockGeneralItem.quantite < quantite
-    ) {
-      alert("Stock insuffisant")
-      return
-    }
-
-    const { data: stockTech } =
+    const { data } =
       await supabase
-        .from("stock_tech")
-        .select("*")
-        .eq("user_id", selectedUser)
-        .eq("produit_id", selectedProduit)
-        .single()
-
-    if (stockTech) {
-      await supabase
-        .from("stock_tech")
-        .update({
-          quantite:
-            stockTech.quantite + quantite,
-        })
-        .eq("id", stockTech.id)
-    } else {
-      await supabase
-        .from("stock_tech")
+        .from("produits")
         .insert({
-          user_id: selectedUser,
-          produit_id: selectedProduit,
-          quantite,
+          nom,
+          reference,
+          categorie,
+          stock_minimum:
+            stockMinimum,
         })
-    }
+        .select()
+        .single()
 
     await supabase
       .from("stock_general")
-      .update({
-        quantite:
-          stockGeneralItem.quantite -
-          quantite,
+      .insert({
+        produit_id: data.id,
+        quantite: 0,
       })
-      .eq("id", stockGeneralItem.id)
 
-    alert("Matériel attribué")
+    setNom("")
+    setReference("")
+    setCategorie("")
+    setStockMinimum(10)
 
     fetchData()
   }
 
-  // ACCEPTER DEMANDE
-  const accepterDemande = async (
-    demande: any
-  ) => {
-    const quantiteAEnvoyer =
-      Number(
-        quantitesDemandes[
-          demande.id
-        ]
-      ) || 0
+  // GROUPE PAR CATEGORIE
+  const groupedStock =
+    stockGeneral.reduce(
+      (acc: any, item: any) => {
+        const cat =
+          item.produits
+            ?.categorie ||
+          "Sans catégorie"
 
-    if (quantiteAEnvoyer <= 0) {
-      alert("Quantité invalide")
-      return
-    }
+        if (!acc[cat]) {
+          acc[cat] = []
+        }
 
-    const stockGeneralItem =
-      stockGeneral.find(
-        (s) =>
-          s.produit_id ===
-          demande.produit_id
-      )
+        acc[cat].push(item)
 
-    if (!stockGeneralItem) {
-      alert("Produit absent")
-      return
-    }
+        return acc
+      },
+      {}
+    )
 
-    if (
-      stockGeneralItem.quantite <
-      quantiteAEnvoyer
-    ) {
-      alert("Stock insuffisant")
-      return
-    }
+  // FILTRE
+  const filteredGroupedStock =
+    Object.entries(groupedStock).reduce(
+      (
+        acc: any,
+        [cat, items]: any
+      ) => {
+        // FILTRE CATEGORIE
+        if (
+          !cat
+            .toLowerCase()
+            .includes(
+              searchCategorie.toLowerCase()
+            )
+        ) {
+          return acc
+        }
 
-    // STOCK TECH
-    const { data: stockTech } =
-      await supabase
-        .from("stock_tech")
-        .select("*")
-        .eq("user_id", demande.user_id)
-        .eq(
-          "produit_id",
-          demande.produit_id
-        )
-        .single()
+        // FILTRE PRODUIT
+        const filtered =
+          items.filter(
+            (item: any) =>
+              item.produits?.nom
+                ?.toLowerCase()
+                .includes(
+                  search.toLowerCase()
+                )
+          )
 
-    if (stockTech) {
-      await supabase
-        .from("stock_tech")
-        .update({
-          quantite:
-            stockTech.quantite +
-            quantiteAEnvoyer,
-        })
-        .eq("id", stockTech.id)
-    } else {
-      await supabase
-        .from("stock_tech")
-        .insert({
-          user_id: demande.user_id,
-          produit_id:
-            demande.produit_id,
-          quantite:
-            quantiteAEnvoyer,
-        })
-    }
+        if (filtered.length > 0) {
+          acc[cat] = filtered
+        }
 
-    // RETIRER STOCK GENERAL
-    await supabase
-      .from("stock_general")
-      .update({
-        quantite:
-          stockGeneralItem.quantite -
-          quantiteAEnvoyer,
-      })
-      .eq("id", stockGeneralItem.id)
-
-    // SUPPRIMER DEMANDE
-    await supabase
-      .from("demandes_stock")
-      .delete()
-      .eq("id", demande.id)
-
-    alert("Demande acceptée")
-
-    fetchData()
-  }
-
-  useEffect(() => {
-    fetchData()
-  }, [])
+        return acc
+      },
+      {}
+    )
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: 20 }}>
       <h1>ADMIN</h1>
 
       <hr />
 
-      <h2>Ajouter Produit</h2>
+      {/* AJOUT PRODUIT */}
+
+      <h2>Ajouter produit</h2>
 
       <input
         placeholder="Nom"
         value={nom}
         onChange={(e) =>
-          setNom(e.target.value)
+          setNom(
+            e.target.value
+          )
         }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         placeholder="Référence"
         value={reference}
         onChange={(e) =>
-          setReference(e.target.value)
+          setReference(
+            e.target.value
+          )
         }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         placeholder="Catégorie"
         value={categorie}
         onChange={(e) =>
-          setCategorie(e.target.value)
+          setCategorie(
+            e.target.value
+          )
         }
       />
 
-      <br /><br />
+      <br />
+      <br />
 
       <input
         type="number"
         value={stockMinimum}
         onChange={(e) =>
           setStockMinimum(
-            Number(e.target.value)
+            Number(
+              e.target.value
+            )
           )
         }
       />
 
-      <br /><br />
-
-      <button onClick={ajouterProduit}>
-        Ajouter Produit
-      </button>
-
-      <hr />
+      <br />
+      <br />
 
       <button
-        onClick={() =>
-          setShowStocks(!showStocks)
-        }
+        onClick={ajouterProduit}
       >
-        {showStocks
-          ? "Réduire Gestion Stock"
-          : "Afficher Gestion Stock"}
+        Ajouter
       </button>
-
-      {showStocks && (
-        <div>
-          <h2>
-            Gestion Stock Général
-          </h2>
-
-          {stockGeneral.map(
-            (item, index) => (
-              <div
-                key={index}
-                style={{
-                  border:
-                    "1px solid blue",
-                  padding: "10px",
-                  marginBottom:
-                    "10px",
-                }}
-              >
-                <h3>
-                  {
-                    item.produits
-                      ?.nom
-                  }
-                </h3>
-
-                <p>
-                  Catégorie :
-                  {" "}
-                  {
-                    item.produits
-                      ?.categorie
-                  }
-                </p>
-
-                <p>
-                  Stock :
-                  {" "}
-                  {item.quantite}
-                </p>
-
-                <button
-                  onClick={() =>
-                    modifierStock(
-                      item,
-                      1
-                    )
-                  }
-                >
-                  +1
-                </button>
-
-                <button
-                  onClick={() =>
-                    modifierStock(
-                      item,
-                      10
-                    )
-                  }
-                >
-                  +10
-                </button>
-
-                <button
-                  onClick={() =>
-                    modifierStock(
-                      item,
-                      -1
-                    )
-                  }
-                >
-                  -1
-                </button>
-
-                <button
-                  onClick={() =>
-                    modifierStock(
-                      item,
-                      -10
-                    )
-                  }
-                >
-                  -10
-                </button>
-              </div>
-            )
-          )}
-        </div>
-      )}
 
       <hr />
 
+      {/* GESTION STOCK */}
+
       <h2>
-        Demandes en attente
+        Gestion des stocks
       </h2>
 
-      {demandes.map(
-        (demande, index) => (
+      <input
+        placeholder="Rechercher produit..."
+        value={search}
+        onChange={(e) =>
+          setSearch(
+            e.target.value
+          )
+        }
+        style={{
+          padding: "10px",
+          width: "300px",
+          marginBottom: "10px",
+        }}
+      />
+
+      <br />
+
+      <input
+        placeholder="Rechercher catégorie..."
+        value={
+          searchCategorie
+        }
+        onChange={(e) =>
+          setSearchCategorie(
+            e.target.value
+          )
+        }
+        style={{
+          padding: "10px",
+          width: "300px",
+          marginBottom: "20px",
+        }}
+      />
+
+      <hr />
+
+      {/* STOCKS */}
+
+      {Object.entries(
+        filteredGroupedStock
+      ).map(
+        ([cat, items]: any) => (
           <div
-            key={index}
+            key={cat}
             style={{
-              border:
-                "1px solid red",
-              padding: "10px",
-              marginBottom: "10px",
+              marginBottom: 30,
             }}
           >
-            <h3>
-              {
-                demande.produits
-                  ?.nom
-              }
-            </h3>
-
-            <p>
-              Quantité demandée :
-              {" "}
-              {
-                demande.quantite_demandee
-              }
-            </p>
-
-            <input
-              type="number"
-              placeholder="Quantité à donner"
-              value={
-                quantitesDemandes[
-                  demande.id
-                ] || ""
-              }
-              onChange={(e) =>
-                setQuantitesDemandes({
-                  ...quantitesDemandes,
-                  [demande.id]:
-                    e.target.value,
-                })
-              }
-            />
-
-            <br /><br />
-
-            <button
-              onClick={() =>
-                accepterDemande(
-                  demande
-                )
-              }
+            <h2
+              style={{
+                color: "blue",
+              }}
             >
-              Accepter demande
-            </button>
+              {cat}
+            </h2>
+
+            {items.map(
+              (item: any) => (
+                <div
+                  key={item.id}
+                  style={{
+                    border:
+                      "1px solid #ccc",
+                    padding: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <h3>
+                    {
+                      item
+                        .produits
+                        ?.nom
+                    }
+                  </h3>
+
+                  <p>
+                    Stock :
+                    {" "}
+                    {
+                      item.quantite
+                    }
+                  </p>
+
+                  <button
+                    onClick={() =>
+                      modifierStock(
+                        item,
+                        1
+                      )
+                    }
+                  >
+                    +1
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      modifierStock(
+                        item,
+                        10
+                      )
+                    }
+                  >
+                    +10
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      modifierStock(
+                        item,
+                        -1
+                      )
+                    }
+                  >
+                    -1
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      modifierStock(
+                        item,
+                        -10
+                      )
+                    }
+                  >
+                    -10
+                  </button>
+                </div>
+              )
+            )}
           </div>
         )
       )}
 
       <hr />
 
+      {/* STOCK TECHNICIEN */}
+
       <h2>
-        Voir Stock Technicien
+        Stock technicien
       </h2>
 
       <select
-        value={selectedTechStock}
+        value={
+          selectedTechStock
+        }
         onChange={(e) =>
           voirStockTechnicien(
             e.target.value
@@ -584,32 +478,36 @@ export default function AdminPage() {
           Choisir technicien
         </option>
 
-        {users.map((user) => (
-          <option
-            key={user.id}
-            value={user.id}
-          >
-            {user.email}
-          </option>
-        ))}
+        {users.map(
+          (user: any) => (
+            <option
+              key={user.id}
+              value={user.id}
+            >
+              {user.email}
+            </option>
+          )
+        )}
       </select>
 
-      <br /><br />
+      <br />
+      <br />
 
       {stockTechnicien.map(
-        (item, index) => (
+        (item: any) => (
           <div
-            key={index}
+            key={item.id}
             style={{
               border:
                 "1px solid green",
-              padding: "10px",
-              marginBottom: "10px",
+              padding: 10,
+              marginBottom: 10,
             }}
           >
             <h3>
               {
-                item.produits?.nom
+                item.produits
+                  ?.nom
               }
             </h3>
 
@@ -625,79 +523,13 @@ export default function AdminPage() {
             <p>
               Quantité :
               {" "}
-              {item.quantite}
+              {
+                item.quantite
+              }
             </p>
           </div>
         )
       )}
-
-      <hr />
-
-      <h2>Attribuer Matériel</h2>
-
-      <select
-        value={selectedUser}
-        onChange={(e) =>
-          setSelectedUser(
-            e.target.value
-          )
-        }
-      >
-        <option value="">
-          Choisir technicien
-        </option>
-
-        {users.map((user) => (
-          <option
-            key={user.id}
-            value={user.id}
-          >
-            {user.email}
-          </option>
-        ))}
-      </select>
-
-      <br /><br />
-
-      <select
-        value={selectedProduit}
-        onChange={(e) =>
-          setSelectedProduit(
-            e.target.value
-          )
-        }
-      >
-        <option value="">
-          Choisir produit
-        </option>
-
-        {produits.map((produit) => (
-          <option
-            key={produit.id}
-            value={produit.id}
-          >
-            {produit.nom}
-          </option>
-        ))}
-      </select>
-
-      <br /><br />
-
-      <input
-        type="number"
-        value={quantite}
-        onChange={(e) =>
-          setQuantite(
-            Number(e.target.value)
-          )
-        }
-      />
-
-      <br /><br />
-
-      <button onClick={attribuerMateriel}>
-        Attribuer
-      </button>
     </div>
   )
 }
