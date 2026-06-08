@@ -640,7 +640,15 @@ export default function AdminPage() {
         padding: 20,
       }}
     >
-      <h1>ADMIN</h1>
+      <h1
+  style={{
+    fontSize: 32,
+    fontWeight: "bold",
+    marginBottom: 20,
+  }}
+>
+  Dashboard Admin
+</h1>
 
       <hr />
 
