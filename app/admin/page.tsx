@@ -3,8 +3,160 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
+function TechnicienStock({
+  tech,
+}: any) {
+  const [stock, setStock] =
+    useState<any[]>([])
+
+  const [open, setOpen] =
+    useState(false)
+
+  const fetchStock =
+    async () => {
+      const { data } =
+        await supabase
+          .from("stock_tech")
+          .select(`
+            *,
+            produits (
+              nom,
+              categorie
+            )
+          `)
+          .eq(
+            "user_id",
+            tech.id
+          )
+
+      setStock(data || [])
+    }
+
+  const toggleOpen =
+    async () => {
+      if (!open) {
+        await fetchStock()
+      }
+
+      setOpen(!open)
+    }
+
+  const stockGroupe =
+    stock.reduce(
+      (
+        acc: any,
+        item: any
+      ) => {
+        const cat =
+          item.produits
+            ?.categorie ||
+          "Sans catégorie"
+
+        if (!acc[cat]) {
+          acc[cat] = []
+        }
+
+        acc[cat].push(item)
+
+        return acc
+      },
+      {}
+    )
+
+  return (
+    <div
+      style={{
+        border:
+          "1px solid gray",
+        padding: 10,
+        marginBottom: 15,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          alignItems:
+            "center",
+        }}
+      >
+        <h3>{tech.email}</h3>
+
+        <button
+          onClick={
+            toggleOpen
+          }
+        >
+          {open
+            ? "Réduire"
+            : "Voir stock"}
+        </button>
+      </div>
+
+      {open && (
+        <div>
+          {Object.entries(
+            stockGroupe
+          ).map(
+            (
+              [cat, items]: any
+            ) => (
+              <div
+                key={cat}
+              >
+                <h4
+                  style={{
+                    color:
+                      "blue",
+                  }}
+                >
+                  {cat}
+                </h4>
+
+                {items.map(
+                  (
+                    item: any
+                  ) => (
+                    <div
+                      key={
+                        item.id
+                      }
+                      style={{
+                        border:
+                          "1px solid #ccc",
+                        padding: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <p>
+                        {
+                          item
+                            .produits
+                            ?.nom
+                        }
+                      </p>
+
+                      <p>
+                        Quantité :
+                        {" "}
+                        {
+                          item.quantite
+                        }
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPage() {
-  // STATES
   const [produits, setProduits] =
     useState<any[]>([])
 
@@ -52,16 +204,16 @@ export default function AdminPage() {
 
   // FETCH
   const fetchData = async () => {
-    // PRODUITS
     const { data: produitsData } =
       await supabase
         .from("produits")
         .select("*")
         .order("nom")
 
-    setProduits(produitsData || [])
+    setProduits(
+      produitsData || []
+    )
 
-    // STOCK GENERAL
     const { data: stockData } =
       await supabase
         .from("stock_general")
@@ -74,15 +226,14 @@ export default function AdminPage() {
             nom,
             reference,
             categorie,
-            stock_minimum,
-            fournisseur,
-            lien_fournisseur
+            stock_minimum
           )
         `)
 
-    setStockGeneral(stockData || [])
+    setStockGeneral(
+      stockData || []
+    )
 
-    // TECHNICIENS
     const { data: usersData } =
       await supabase
         .from("techniciens")
@@ -91,22 +242,27 @@ export default function AdminPage() {
 
     setUsers(usersData || [])
 
-    // DEMANDES
-    const { data: demandesData } =
-      await supabase
-        .from("demandes_stock")
-        .select(`
-          *,
-          produits (
-            nom
-          ),
-          techniciens (
-            email
-          )
-        `)
-        .eq("statut", "en_attente")
+    const {
+      data: demandesData,
+    } = await supabase
+      .from("demandes_stock")
+      .select(`
+        *,
+        produits (
+          nom
+        ),
+        techniciens (
+          email
+        )
+      `)
+      .eq(
+        "statut",
+        "en_attente"
+      )
 
-    setDemandes(demandesData || [])
+    setDemandes(
+      demandesData || []
+    )
   }
 
   useEffect(() => {
@@ -144,7 +300,6 @@ export default function AdminPage() {
         return
       }
 
-      // CREER STOCK GENERAL
       await supabase
         .from(
           "stock_general"
@@ -257,7 +412,6 @@ export default function AdminPage() {
         return
       }
 
-      // STOCK TECH
       const {
         data: stockTech,
       } = await supabase
@@ -301,7 +455,6 @@ export default function AdminPage() {
           })
       }
 
-      // RETIRER STOCK GENERAL
       await supabase
         .from(
           "stock_general"
@@ -344,7 +497,6 @@ export default function AdminPage() {
         return
       }
 
-      // STOCK TECH
       const {
         data: stockTech,
       } = await supabase
@@ -389,7 +541,6 @@ export default function AdminPage() {
           })
       }
 
-      // STOCK GENERAL
       const stockItem =
         stockGeneral.find(
           (s: any) =>
@@ -411,7 +562,6 @@ export default function AdminPage() {
           stockItem.id
         )
 
-      // SUPPRIMER DEMANDE
       await supabase
         .from(
           "demandes_stock"
@@ -429,7 +579,6 @@ export default function AdminPage() {
       fetchData()
     }
 
-  // CATEGORIES
   const categories = [
     ...new Set(
       produits.map(
@@ -439,7 +588,6 @@ export default function AdminPage() {
     ),
   ]
 
-  // FILTRE
   const stockFiltre =
     stockGeneral.filter(
       (item: any) => {
@@ -464,7 +612,6 @@ export default function AdminPage() {
       }
     )
 
-  // GROUPER
   const stockGroupe =
     stockFiltre.reduce(
       (
@@ -496,81 +643,6 @@ export default function AdminPage() {
       <h1>ADMIN</h1>
 
       <hr />
-
-      {/* AJOUT PRODUIT */}
-
-      <h2>
-        Ajouter Produit
-      </h2>
-
-      <input
-        placeholder="Nom"
-        value={nom}
-        onChange={(e) =>
-          setNom(
-            e.target.value
-          )
-        }
-      />
-
-      <br />
-      <br />
-
-      <input
-        placeholder="Référence"
-        value={reference}
-        onChange={(e) =>
-          setReference(
-            e.target.value
-          )
-        }
-      />
-
-      <br />
-      <br />
-
-      <input
-        placeholder="Catégorie"
-        value={categorie}
-        onChange={(e) =>
-          setCategorie(
-            e.target.value
-          )
-        }
-      />
-
-      <br />
-      <br />
-
-      <input
-        type="number"
-        placeholder="Stock minimum"
-        value={
-          stockMinimum
-        }
-        onChange={(e) =>
-          setStockMinimum(
-            Number(
-              e.target.value
-            )
-          )
-        }
-      />
-
-      <br />
-      <br />
-
-      <button
-        onClick={
-          ajouterProduit
-        }
-      >
-        Ajouter Produit
-      </button>
-
-      <hr />
-
-      {/* DEMANDES */}
 
       <h2>
         Demandes en attente
@@ -648,7 +720,20 @@ export default function AdminPage() {
 
       <hr />
 
-      {/* GESTION STOCK */}
+      <h2>
+        Stock des Techniciens
+      </h2>
+
+      {users.map(
+        (tech: any) => (
+          <TechnicienStock
+            key={tech.id}
+            tech={tech}
+          />
+        )
+      )}
+
+      <hr />
 
       <div
         style={{
@@ -678,8 +763,6 @@ export default function AdminPage() {
 
       {showStock && (
         <>
-          {/* RECHERCHE */}
-
           <input
             placeholder="Recherche produit..."
             value={search}
@@ -689,16 +772,10 @@ export default function AdminPage() {
                   .value
               )
             }
-            style={{
-              padding: 10,
-              width: 300,
-            }}
           />
 
           <br />
           <br />
-
-          {/* FILTRE CATEGORIE */}
 
           <select
             value={
@@ -732,8 +809,6 @@ export default function AdminPage() {
 
           <hr />
 
-          {/* STOCK */}
-
           {Object.entries(
             stockGroupe
           ).map(
@@ -743,12 +818,7 @@ export default function AdminPage() {
               <div
                 key={cat}
               >
-                <h2
-                  style={{
-                    color:
-                      "blue",
-                  }}
-                >
+                <h2>
                   {cat}
                 </h2>
 
@@ -760,12 +830,6 @@ export default function AdminPage() {
                       key={
                         item.id
                       }
-                      style={{
-                        border:
-                          "1px solid blue",
-                        padding: 10,
-                        marginBottom: 10,
-                      }}
                     >
                       <h3>
                         {
@@ -822,17 +886,6 @@ export default function AdminPage() {
                         onClick={() =>
                           modifierStock(
                             item,
-                            10
-                          )
-                        }
-                      >
-                        +10
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          modifierStock(
-                            item,
                             -1
                           )
                         }
@@ -840,16 +893,7 @@ export default function AdminPage() {
                         -1
                       </button>
 
-                      <button
-                        onClick={() =>
-                          modifierStock(
-                            item,
-                            -10
-                          )
-                        }
-                      >
-                        -10
-                      </button>
+                      <hr />
                     </div>
                   )
                 )}
@@ -860,8 +904,6 @@ export default function AdminPage() {
       )}
 
       <hr />
-
-      {/* ATTRIBUER */}
 
       <h2>
         Attribuer Matériel
